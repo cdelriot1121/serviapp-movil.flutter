@@ -20,14 +20,30 @@ class OrbitalServices extends StatelessWidget {
         alignment: Alignment.center,
         clipBehavior: Clip.none,
         children: [
+          // 1. EL NUEVO SHOCKWAVE (Anillo de energía en lugar de círculo blanco)
           if (shockwaveProgress > 0)
             Transform.scale(
               scale: shockwaveProgress * 50, 
               child: Container(
                 width: 50, height: 50,
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle, 
+                  // El interior es del mismo color oscuro que el fondo del splash
+                  color: const Color(0xFF030914), 
+                  // El borde es el que brilla y se expande
+                  border: Border.all(color: Colors.cyanAccent, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.cyanAccent.withValues(alpha: 0.5), 
+                      blurRadius: 10, 
+                      spreadRadius: 5
+                    )
+                  ]
+                ),
               ),
             ),
+            
+          // 2. LOS SERVICIOS ORBITANDO
           if (shockwaveProgress == 0) ...[
             _buildOrbitalNode(icon: Icons.water_drop_rounded, color: AppColors.primary, angleOffset: 0, currentAngle: angle, radius: orbitRadius, scale: orbitProgress),
             _buildOrbitalNode(icon: Icons.bolt_rounded, color: AppColors.orange, angleOffset: math.pi * 2 / 3, currentAngle: angle, radius: orbitRadius, scale: orbitProgress),

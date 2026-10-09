@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-// Importamos de nuestra nueva carpeta de widgets
 import '../widgets/glass_receipt.dart';
 import '../widgets/orbital_services.dart';
-// Importamos el login navegando hacia atrás hasta la carpeta features/auth
 import '../../../auth/presentation/views/login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -36,7 +34,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       if (status == AnimationStatus.completed) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
-            transitionDuration: const Duration(milliseconds: 600),
+            transitionDuration: const Duration(milliseconds: 400),
             pageBuilder: (context, animation, secondaryAnimation) => const LoginScreen(), 
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
@@ -54,6 +52,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     setState(() => _showReceipt = true);
   }
 
+  // Secuencia final (Sin audio)
   void _onScanCompleted() {
     if (!mounted || _fusionStarted) return;
     _fusionStarted = true;
@@ -87,7 +86,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                   Icon(Icons.auto_graph_rounded, color: Colors.cyanAccent, size: 90),
                   SizedBox(height: 20),
                   Text(
-                    'ServiApp',
+                    'SERVIAPP',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 36,
@@ -109,7 +108,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                   child: child,
                 );
               },
-              child: GlassReceipt(onScanCompleted: _onScanCompleted),
+              child: GlassReceipt(
+                onScanCompleted: _onScanCompleted, 
+              ),
             ),
           if (_showReceipt)
             IgnorePointer(

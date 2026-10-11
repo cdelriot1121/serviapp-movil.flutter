@@ -1,6 +1,8 @@
 
 import 'package:flutter/material.dart';
+
 import '../../../../core/theme/app_colors.dart';
+import '../../data/services/auth_service.dart';
 
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key});
@@ -13,6 +15,9 @@ class _LoginFormState extends State<LoginForm> {
   // Controladores de los campos
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
+  // Servicio que conecta Flutter con Spring Boot
+  final AuthService _authService = AuthService();
 
   // Clave para validar el formulario
   final _formKey = GlobalKey<FormState>();
@@ -29,7 +34,6 @@ class _LoginFormState extends State<LoginForm> {
   void initState() {
     super.initState();
 
-    // Inicia la animación después de construir la pantalla
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         setState(() {
@@ -67,57 +71,95 @@ class _LoginFormState extends State<LoginForm> {
     return null;
   }
 
-  // Proceso temporal de inicio de sesión
+  // INICIO DE SESIÓN REAL CON SPRING BOOT
   Future<void> _login() async {
-    // Activamos los mensajes de validación
+    if (_isLoading) return;
+
     setState(() {
       _showErrors = true;
     });
 
-    // Comprobamos los campos antes de continuar
+    // Validar campos
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // Ocultamos el teclado
+    // Ocultar teclado
     FocusScope.of(context).unfocus();
 
     setState(() {
       _isLoading = true;
     });
 
-    // Simulamos la petición a Spring Boot
-    await Future.delayed(
-      const Duration(seconds: 2),
-    );
+    try {
+      // Enviar credenciales a Spring Boot
+      final respuesta = await _authService.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _isLoading = false;
-    });
+      // Comprobar que Spring Boot autenticó al usuario
+      if (respuesta['autenticado'] == true) {
+        final nombre =
+            (respuesta['nombre'] ?? 'Usuario').toString();
 
-    // Mensaje informativo temporal
+        // Abrir pantalla nativa de bienvenida
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => LoginSuccessScreen(
+              nombre: nombre,
+            ),
+          ),
+        );
+      } else {
+        _mostrarError(
+          respuesta['mensaje']?.toString() ??
+              'No se pudo iniciar sesión.',
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      // Mostrar el mensaje enviado por AuthService
+      String mensaje = e.toString();
+
+      if (mensaje.startsWith('Exception: ')) {
+        mensaje = mensaje.substring('Exception: '.length);
+      }
+
+      _mostrarError(mensaje);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // Mostrar errores de inicio de sesión
+  void _mostrarError(String mensaje) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Row(
+        content: Row(
           children: [
-            Icon(
-              Icons.info_outline,
+            const Icon(
+              Icons.error_outline,
               color: Colors.white,
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                'El formulario está listo. '
-                'Pronto lo conectaremos con ServiApp.',
-              ),
+              child: Text(mensaje),
             ),
           ],
         ),
-        backgroundColor: AppColors.primary,
+        backgroundColor: Colors.red.shade700,
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 4),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
         ),
@@ -157,7 +199,7 @@ class _LoginFormState extends State<LoginForm> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Título principal
+                // TÍTULO PRINCIPAL
                 const Text(
                   'Iniciar sesión',
                   style: TextStyle(
@@ -185,6 +227,9 @@ class _LoginFormState extends State<LoginForm> {
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                   validator: _validateEmail,
+                  autofillHints: const [
+                    AutofillHints.email,
+                  ],
 
                   decoration: const InputDecoration(
                     labelText: 'Correo electrónico',
@@ -203,6 +248,10 @@ class _LoginFormState extends State<LoginForm> {
                   obscureText: _obscurePassword,
                   textInputAction: TextInputAction.done,
                   validator: _validatePassword,
+                  autofillHints: const [
+                    AutofillHints.password,
+                  ],
+
                   onFieldSubmitted: (_) {
                     if (!_isLoading) {
                       _login();
@@ -225,6 +274,7 @@ class _LoginFormState extends State<LoginForm> {
                         duration: const Duration(
                           milliseconds: 200,
                         ),
+
                         child: Icon(
                           _obscurePassword
                               ? Icons.visibility_off_outlined
@@ -244,32 +294,34 @@ class _LoginFormState extends State<LoginForm> {
 
                 const SizedBox(height: 12),
 
-              // Enlace para recuperar contraseña
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Próximamente podrás recuperar tu contraseña.',
+                // RECUPERAR CONTRASEÑA
+                Align(
+                  alignment: Alignment.centerRight,
+
+                  child: TextButton(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Próximamente podrás recuperar tu contraseña.',
+                          ),
+                          behavior: SnackBarBehavior.floating,
                         ),
-                        behavior: SnackBarBehavior.floating,
+                      );
+                    },
+
+                    child: const Text(
+                      '¿Olvidaste tu contraseña?',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                       ),
-                    );
-                  },
-                  child: const Text(
-                    '¿Olvidaste tu contraseña?',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
                 // BOTÓN ANIMADO DE INICIO DE SESIÓN
                 SizedBox(
@@ -283,6 +335,7 @@ class _LoginFormState extends State<LoginForm> {
                       duration: const Duration(
                         milliseconds: 300,
                       ),
+
                       transitionBuilder: (child, animation) {
                         return FadeTransition(
                           opacity: animation,
@@ -298,15 +351,18 @@ class _LoginFormState extends State<LoginForm> {
                               key: ValueKey('loading'),
                               width: 24,
                               height: 24,
+
                               child: CircularProgressIndicator(
                                 color: Colors.white,
                                 strokeWidth: 2.5,
                               ),
                             )
+
                           : const Row(
                               key: ValueKey('login'),
                               mainAxisAlignment:
                                   MainAxisAlignment.center,
+
                               children: [
                                 Text('Iniciar sesión'),
                                 SizedBox(width: 10),
@@ -317,6 +373,79 @@ class _LoginFormState extends State<LoginForm> {
                               ],
                             ),
                     ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// PANTALLA TEMPORAL DE BIENVENIDA
+// Posteriormente será el inicio de ServiApp Mobile
+
+class LoginSuccessScreen extends StatelessWidget {
+  final String nombre;
+
+  const LoginSuccessScreen({
+    super.key,
+    required this.nombre,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.check_circle_rounded,
+                  size: 100,
+                  color: Colors.green,
+                ),
+
+                const SizedBox(height: 24),
+
+                const Text(
+                  '¡Login exitoso!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                Text(
+                  'Bienvenido, $nombre',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                const Text(
+                  'Has iniciado sesión correctamente en ServiApp Mobile.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],

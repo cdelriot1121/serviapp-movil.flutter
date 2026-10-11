@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:serviapp/features/auth/presentation/views/home_screen.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/services/auth_service.dart';
@@ -108,7 +109,7 @@ class _LoginFormState extends State<LoginForm> {
         // Abrir pantalla nativa de bienvenida
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => LoginSuccessScreen(
+            builder: (context) => HomeScreen(
               nombre: nombre,
             ),
           ),
@@ -384,75 +385,3 @@ class _LoginFormState extends State<LoginForm> {
   }
 }
 
-// PANTALLA TEMPORAL DE BIENVENIDA
-// Posteriormente será el inicio de ServiApp Mobile
-
-class LoginSuccessScreen extends StatelessWidget {
-  final String nombre;
-
-  const LoginSuccessScreen({
-    super.key,
-    required this.nombre,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.check_circle_rounded,
-                  size: 100,
-                  color: Colors.green,
-                ),
-
-                const SizedBox(height: 24),
-
-                const Text(
-                  '¡Login exitoso!',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                Text(
-                  'Bienvenido, $nombre',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                const Text(
-                  'Has iniciado sesión correctamente en ServiApp Mobile.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

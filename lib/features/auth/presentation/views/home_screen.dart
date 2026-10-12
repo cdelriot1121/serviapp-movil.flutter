@@ -2,8 +2,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../data/services/auth_service.dart';
 import '../../../recibos/presentation/escanear_recibo.dart';
 import '../../../recibos/presentation/views/mis_recibos_screen.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String nombre;
@@ -111,6 +113,44 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  Future<void> _cerrarSesion() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (dialogo) => AlertDialog(
+        icon: const Icon(
+          Icons.logout_rounded,
+          size: 40,
+          color: AppColors.primary,
+        ),
+        title: const Text('¿Cerrar sesión?'),
+        content: const Text(
+          'Tendrás que iniciar sesión de nuevo para usar ServiApp.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogo).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogo).pop(true),
+            child: const Text('Cerrar sesión'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true || !mounted) return;
+
+    await AuthService().logout();
+    if (!mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (_) => false,
+    );
+  }
+
   Widget _buildHeader() {
     final topPadding = MediaQuery.of(context).padding.top;
 
@@ -167,15 +207,15 @@ class _HomeScreenState extends State<HomeScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.water_drop_outlined,
                         color: Colors.white,
                         size: 25,
                       ),
-                      SizedBox(width: 9),
-                      Text(
+                      const SizedBox(width: 9),
+                      const Text(
                         'ServiApp',
                         style: TextStyle(
                           color: Colors.white,
@@ -184,6 +224,8 @@ class _HomeScreenState extends State<HomeScreen>
                           letterSpacing: 0.3,
                         ),
                       ),
+                      const Spacer(),
+                      _LogoutButton(onTap: _cerrarSesion),
                     ],
                   ),
 
@@ -255,6 +297,48 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ),
       ],
+    );
+  }
+}
+
+// Botón translúcido de cerrar sesión sobre el encabezado azul.
+class _LogoutButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _LogoutButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Cerrar sesión',
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.16),
+        shape: StadiumBorder(
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.28)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.logout_rounded, color: Colors.white, size: 17),
+                SizedBox(width: 6),
+                Text(
+                  'Salir',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/boton_inicio.dart';
 import '../../data/models/recibo.dart';
 import '../../data/services/recibo_service.dart';
 import 'revisar_recibo_screen.dart';
@@ -104,6 +105,7 @@ class _AnalizandoReciboScreenState extends State<AnalizandoReciboScreen>
         title: const Text('Escanear recibo'),
         backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
+        actions: const [BotonInicio()],
       ),
       body: SafeArea(
         child: Padding(

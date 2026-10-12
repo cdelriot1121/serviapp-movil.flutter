@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/boton_inicio.dart';
 import '../../data/models/recibo.dart';
 import '../../data/services/recibo_service.dart';
 import '../utils/formatos.dart';
@@ -90,6 +91,7 @@ class _DetalleReciboScreenState extends State<DetalleReciboScreen> {
               onPressed: _eliminando ? null : _eliminar,
               icon: const Icon(Icons.delete_outline_rounded),
             ),
+            const BotonInicio(),
         ],
       ),
       body: ListView(

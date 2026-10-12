@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/boton_inicio.dart';
 import '../../data/models/recibo.dart';
 import '../../data/services/recibo_service.dart';
 import '../escanear_recibo.dart';
@@ -64,6 +65,7 @@ class _MisRecibosScreenState extends State<MisRecibosScreen> {
         title: const Text('Mis recibos'),
         backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
+        actions: const [BotonInicio()],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _escanear,

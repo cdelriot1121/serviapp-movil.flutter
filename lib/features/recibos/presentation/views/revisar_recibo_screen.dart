@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/boton_inicio.dart';
 import '../../data/models/recibo.dart';
 import '../../data/services/recibo_service.dart';
 import '../utils/formatos.dart';
@@ -399,6 +400,7 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
             onPressed: _verFoto,
             icon: const Icon(Icons.image_search_rounded),
           ),
+          const BotonInicio(),
         ],
       ),
       body: Form(

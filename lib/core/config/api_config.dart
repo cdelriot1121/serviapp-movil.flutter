@@ -35,6 +35,7 @@ class ApiConfig {
   // Endpoints de autenticación
   static const String loginEndpoint = '/api/mobile/auth/login';
   static const String sessionEndpoint = '/api/mobile/auth/me';
+  static const String logoutEndpoint = '/api/mobile/auth/logout';
 
   // Endpoints de recibos
   static const String recibosEndpoint = '/api/mobile/recibos';

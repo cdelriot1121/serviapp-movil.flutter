@@ -4,4 +4,6 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Permite HTTP sin cifrar hacia el FastAPI local (http://IP_DEL_PC:8000) en desarrollo -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

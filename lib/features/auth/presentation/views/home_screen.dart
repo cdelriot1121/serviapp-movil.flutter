@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../recibos/presentation/escanear_recibo.dart';
+import '../../../recibos/presentation/views/mis_recibos_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String nombre;
@@ -42,29 +44,6 @@ class _HomeScreenState extends State<HomeScreen>
   void dispose() {
     _animationController.dispose();
     super.dispose();
-  }
-
-  void _mostrarProximamente() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.auto_awesome_outlined, color: Colors.white),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Próximamente podrás escanear tus recibos con ServiApp.',
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
-      ),
-    );
   }
 
   @override
@@ -266,7 +245,14 @@ class _HomeScreenState extends State<HomeScreen>
         _ToolIcon(
           icon: Icons.document_scanner_outlined,
           title: 'Escanear recibo',
-          onTap: _mostrarProximamente,
+          onTap: () => iniciarEscaneoRecibo(context),
+        ),
+        _ToolIcon(
+          icon: Icons.folder_copy_outlined,
+          title: 'Mis recibos',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const MisRecibosScreen()),
+          ),
         ),
       ],
     );

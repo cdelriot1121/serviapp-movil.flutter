@@ -1,5 +1,6 @@
 package com.example.serviapp
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity()
+// FlutterFragmentActivity es necesario para el inicio de sesión con huella (local_auth)
+class MainActivity : FlutterFragmentActivity()

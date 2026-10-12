@@ -21,12 +21,12 @@ class ApiConfig {
       ? _springUrl
       : (isProduction ? productionUrl : developmentUrl);
 
-  // Servicio FastAPI de análisis de recibos (OpenCV + OCR).
-  // Por defecto el PC de desarrollo en la red Wi-Fi local; se cambia con:
+  // Servicio FastAPI de análisis de recibos (OpenCV + OCR) desplegado en Railway.
+  // Para usar el FastAPI local del PC (misma red Wi-Fi):
   // flutter run --dart-define=FASTAPI_URL=http://IP_DEL_PC:8000
   static const String fastApiUrl = String.fromEnvironment(
     'FASTAPI_URL',
-    defaultValue: 'http://192.168.1.55:8000',
+    defaultValue: 'https://fastapiserviapp-production.up.railway.app',
   );
 
   // Solo si FastAPI se configuró con SERVIAPP_API_KEY

@@ -4,6 +4,7 @@ import 'package:serviapp/features/auth/presentation/views/home_screen.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/services/biometric_service.dart';
 
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key});
@@ -20,6 +21,9 @@ class _LoginFormState extends State<LoginForm> {
   // Servicio que conecta Flutter con Spring Boot
   final AuthService _authService = AuthService();
 
+  // Servicio de inicio de sesión con huella
+  final BiometricService _biometricService = BiometricService();
+
   // Clave para validar el formulario
   final _formKey = GlobalKey<FormState>();
 
@@ -27,6 +31,10 @@ class _LoginFormState extends State<LoginForm> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _showErrors = false;
+
+  // Estados de la huella
+  bool _huellaDisponible = false;
+  bool _huellaActivada = false;
 
   // Controla la animación de entrada
   bool _isVisible = false;
@@ -40,6 +48,8 @@ class _LoginFormState extends State<LoginForm> {
         setState(() {
           _isVisible = true;
         });
+
+        _cargarEstadoHuella();
       }
     });
   }
@@ -72,7 +82,25 @@ class _LoginFormState extends State<LoginForm> {
     return null;
   }
 
-  // INICIO DE SESIÓN REAL CON SPRING BOOT
+  // Revisa si se puede entrar con huella y la pide automáticamente
+  Future<void> _cargarEstadoHuella() async {
+    final disponible = await _biometricService.isAvailable();
+    final activada =
+        disponible && await _biometricService.isEnabled();
+
+    if (!mounted) return;
+
+    setState(() {
+      _huellaDisponible = disponible;
+      _huellaActivada = activada;
+    });
+
+    if (activada) {
+      _loginConHuella();
+    }
+  }
+
+  // INICIO DE SESIÓN CON CORREO Y CONTRASEÑA
   Future<void> _login() async {
     if (_isLoading) return;
 
@@ -88,6 +116,42 @@ class _LoginFormState extends State<LoginForm> {
     // Ocultar teclado
     FocusScope.of(context).unfocus();
 
+    await _autenticar(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      conHuella: false,
+    );
+  }
+
+  // INICIO DE SESIÓN CON HUELLA
+  Future<void> _loginConHuella() async {
+    if (_isLoading) return;
+
+    FocusScope.of(context).unfocus();
+
+    try {
+      final credenciales = await _biometricService.authenticate();
+
+      // El usuario canceló o la huella no coincidió
+      if (credenciales == null || !mounted) return;
+
+      await _autenticar(
+        email: credenciales.email,
+        password: credenciales.password,
+        conHuella: true,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _mostrarError(_limpiarMensaje(e));
+    }
+  }
+
+  // INICIO DE SESIÓN REAL CON SPRING BOOT
+  Future<void> _autenticar({
+    required String email,
+    required String password,
+    required bool conHuella,
+  }) async {
     setState(() {
       _isLoading = true;
     });
@@ -95,8 +159,8 @@ class _LoginFormState extends State<LoginForm> {
     try {
       // Enviar credenciales a Spring Boot
       final respuesta = await _authService.login(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+        email: email,
+        password: password,
       );
 
       if (!mounted) return;
@@ -105,6 +169,11 @@ class _LoginFormState extends State<LoginForm> {
       if (respuesta['autenticado'] == true) {
         final nombre =
             (respuesta['nombre'] ?? 'Usuario').toString();
+
+        if (!conHuella) {
+          await _gestionarHuellaTrasLogin(email, password);
+          if (!mounted) return;
+        }
 
         // Abrir pantalla nativa de bienvenida
         Navigator.of(context).pushReplacement(
@@ -123,11 +192,23 @@ class _LoginFormState extends State<LoginForm> {
     } catch (e) {
       if (!mounted) return;
 
-      // Mostrar el mensaje enviado por AuthService
-      String mensaje = e.toString();
+      final mensaje = _limpiarMensaje(e);
 
-      if (mensaje.startsWith('Exception: ')) {
-        mensaje = mensaje.substring('Exception: '.length);
+      // Si la contraseña guardada ya no sirve, se desactiva la huella
+      if (conHuella &&
+          mensaje == 'Correo o contraseña incorrectos.') {
+        await _biometricService.disable();
+        if (!mounted) return;
+
+        setState(() {
+          _huellaActivada = false;
+        });
+
+        _mostrarError(
+          'Tu contraseña cambió. Ingresa con tu correo y '
+          'contraseña para volver a activar la huella.',
+        );
+        return;
       }
 
       _mostrarError(mensaje);
@@ -138,6 +219,77 @@ class _LoginFormState extends State<LoginForm> {
         });
       }
     }
+  }
+
+  // Después de un login con contraseña: ofrece activar la huella
+  // o actualiza la contraseña guardada si ya estaba activada
+  Future<void> _gestionarHuellaTrasLogin(
+    String email,
+    String password,
+  ) async {
+    if (!_huellaDisponible) return;
+
+    if (_huellaActivada) {
+      await _biometricService.enable(
+        email: email,
+        password: password,
+      );
+      return;
+    }
+
+    final activar = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        icon: const Icon(
+          Icons.fingerprint,
+          size: 48,
+          color: AppColors.primary,
+        ),
+        title: const Text('¿Entrar con tu huella?'),
+        content: const Text(
+          'La próxima vez podrás iniciar sesión solo con tu '
+          'huella, sin escribir tu correo y contraseña.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Ahora no'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Activar'),
+          ),
+        ],
+      ),
+    );
+
+    if (activar != true) return;
+
+    // Confirmar con la huella antes de guardar las credenciales
+    try {
+      final confirmada = await _biometricService.confirmIdentity();
+      if (!confirmada) return;
+
+      await _biometricService.enable(
+        email: email,
+        password: password,
+      );
+    } catch (_) {
+      // Si falla, el usuario igual entra; solo no se activa la huella
+    }
+  }
+
+  // Quita el prefijo "Exception: " de los errores
+  String _limpiarMensaje(Object e) {
+    String mensaje = e.toString();
+
+    if (mensaje.startsWith('Exception: ')) {
+      mensaje = mensaje.substring('Exception: '.length);
+    }
+
+    return mensaje;
   }
 
   // Mostrar errores de inicio de sesión
@@ -376,6 +528,36 @@ class _LoginFormState extends State<LoginForm> {
                     ),
                   ),
                 ),
+
+                // BOTÓN DE INICIO CON HUELLA
+                if (_huellaActivada) ...[
+                  const SizedBox(height: 16),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+
+                    child: OutlinedButton.icon(
+                      onPressed:
+                          _isLoading ? null : _loginConHuella,
+                      icon: const Icon(
+                        Icons.fingerprint,
+                        size: 26,
+                      ),
+                      label: const Text('Entrar con huella'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(
+                          color: AppColors.primary,
+                          width: 1.4,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

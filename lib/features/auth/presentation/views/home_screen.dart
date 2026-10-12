@@ -3,8 +3,14 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/services/auth_service.dart';
+import '../../../recibos/data/models/recibo.dart';
 import '../../../recibos/presentation/escanear_recibo.dart';
+import '../../../recibos/presentation/utils/estado_pago.dart';
+import '../../../recibos/presentation/utils/formatos.dart';
+import '../../../recibos/presentation/views/detalle_recibo_screen.dart';
 import '../../../recibos/presentation/views/mis_recibos_screen.dart';
+import '../../../recibos/presentation/widgets/boton_pago.dart';
+import '../../../recordatorios/recordatorios_service.dart';
 import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -24,6 +30,9 @@ class _HomeScreenState extends State<HomeScreen>
   late final AnimationController _animationController;
   bool _visible = false;
 
+  // Último recibo sin pagar de cada servicio (null mientras carga)
+  List<Recibo>? _pendientes;
+
   @override
   void initState() {
     super.initState();
@@ -34,6 +43,10 @@ class _HomeScreenState extends State<HomeScreen>
       duration: const Duration(seconds: 12),
     )..repeat();
 
+    // Programa los recordatorios de pago y carga "Tus pagos".
+    _iniciarRecordatorios();
+    RecordatoriosService.cambios.addListener(_recargarPagos);
+
     // Aparición inicial del contenido.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -42,8 +55,25 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
+  Future<void> _iniciarRecordatorios() async {
+    final recibos = await RecordatoriosService.alIniciarSesion(widget.nombre);
+    if (mounted && recibos != null) {
+      setState(() => _pendientes = pagosPendientes(recibos));
+    }
+  }
+
+  Future<void> _recargarPagos() async {
+    try {
+      final recibos = await RecordatoriosService.recibosActualizados();
+      if (mounted) setState(() => _pendientes = pagosPendientes(recibos));
+    } catch (_) {
+      // Se deja la última lista conocida
+    }
+  }
+
   @override
   void dispose() {
+    RecordatoriosService.cambios.removeListener(_recargarPagos);
     _animationController.dispose();
     super.dispose();
   }
@@ -101,6 +131,8 @@ class _HomeScreenState extends State<HomeScreen>
 
                         // Menú de herramientas.
                         _buildToolsMenu(),
+
+                        _buildPagos(),
                       ],
                     ),
                   ),
@@ -142,6 +174,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (confirmar != true || !mounted) return;
 
+    await RecordatoriosService.alCerrarSesion();
     await AuthService().logout();
     if (!mounted) return;
 
@@ -273,6 +306,48 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  // Recibos sin pagar con su fecha límite. Se oculta si no hay ninguno.
+  Widget _buildPagos() {
+    final pendientes = _pendientes;
+    if (pendientes == null || pendientes.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Tus pagos',
+            style: TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Márcalos como pagados para dejar de recibir recordatorios.',
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 14),
+          for (final recibo in pendientes) ...[
+            _FilaPago(
+              recibo: recibo,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DetalleReciboScreen(recibo: recibo),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildToolsMenu() {
     return GridView.count(
       crossAxisCount: 3,
@@ -297,6 +372,75 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ),
       ],
+    );
+  }
+}
+
+// Fila de un recibo pendiente en "Tus pagos".
+class _FilaPago extends StatelessWidget {
+  final Recibo recibo;
+  final VoidCallback onTap;
+
+  const _FilaPago({required this.recibo, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final empresa = recibo.empresa;
+    final estado = EstadoPago.de(recibo);
+
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: estado.vencido || estado.dias == 0
+                  ? estado.color.withValues(alpha: 0.45)
+                  : AppColors.border,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: empresa.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(empresa.icono, color: empresa.color, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${empresa.servicio} · ${formatearPesos(recibo.valorTotal)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    EtiquetaEstadoPago(estado: estado),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              BotonPago(recibo: recibo),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

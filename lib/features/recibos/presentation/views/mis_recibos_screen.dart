@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/boton_inicio.dart';
+import '../../../recordatorios/recordatorios_service.dart';
 import '../../data/models/recibo.dart';
 import '../../data/services/recibo_service.dart';
+import '../utils/estado_pago.dart';
 import '../escanear_recibo.dart';
 import '../utils/formatos.dart';
+import '../widgets/boton_pago.dart';
 import 'detalle_recibo_screen.dart';
 
 /// Archivero de recibos escaneados del usuario, filtrable por servicio.
@@ -17,8 +20,6 @@ class MisRecibosScreen extends StatefulWidget {
 }
 
 class _MisRecibosScreenState extends State<MisRecibosScreen> {
-  final ReciboService _service = ReciboService();
-
   // null = todos; si no, ENERGIA, AGUA o GAS
   String? _filtro;
   List<Recibo>? _recibos;
@@ -28,12 +29,30 @@ class _MisRecibosScreenState extends State<MisRecibosScreen> {
   void initState() {
     super.initState();
     _cargar();
+    // Pagos marcados desde el detalle o desde una notificación
+    RecordatoriosService.cambios.addListener(_cargar);
+  }
+
+  @override
+  void dispose() {
+    RecordatoriosService.cambios.removeListener(_cargar);
+    super.dispose();
+  }
+
+  // Actualiza la tarjeta al instante, sin esperar a recargar la lista
+  void _reemplazar(Recibo actualizado) {
+    setState(() {
+      _recibos = [
+        for (final r in _recibos ?? const <Recibo>[]) r.id == actualizado.id ? actualizado : r,
+      ];
+    });
   }
 
   Future<void> _cargar() async {
+    if (!mounted) return;
     setState(() => _error = null);
     try {
-      final recibos = await _service.listar(tipoServicio: _filtro);
+      final recibos = await RecordatoriosService.recibosActualizados(tipoServicio: _filtro);
       if (mounted) setState(() => _recibos = recibos);
     } on ReciboException catch (e) {
       if (mounted) {
@@ -143,7 +162,11 @@ class _MisRecibosScreenState extends State<MisRecibosScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
         itemCount: recibos.length,
         separatorBuilder: (_, _) => const SizedBox(height: 10),
-        itemBuilder: (_, i) => _TarjetaRecibo(recibo: recibos[i], onTap: () => _abrir(recibos[i])),
+        itemBuilder: (_, i) => _TarjetaRecibo(
+          recibo: recibos[i],
+          onTap: () => _abrir(recibos[i]),
+          onPago: _reemplazar,
+        ),
       ),
     );
   }
@@ -174,8 +197,9 @@ class _MisRecibosScreenState extends State<MisRecibosScreen> {
 class _TarjetaRecibo extends StatelessWidget {
   final Recibo recibo;
   final VoidCallback onTap;
+  final ValueChanged<Recibo> onPago;
 
-  const _TarjetaRecibo({required this.recibo, required this.onTap});
+  const _TarjetaRecibo({required this.recibo, required this.onTap, required this.onPago});
 
   @override
   Widget build(BuildContext context) {
@@ -192,57 +216,71 @@ class _TarjetaRecibo extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: AppColors.border),
           ),
-          child: Row(
+          child: Column(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: empresa.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(empresa.icono, color: empresa.color),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      formatearPeriodoLargo(recibo.periodoFacturado),
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${empresa.nombre} · ${empresa.identificador} ${recibo.identificador ?? ''}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              Row(
                 children: [
-                  Text(
-                    formatearPesos(recibo.valorTotal),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: empresa.color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(empresa.icono, color: empresa.color),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          formatearPeriodoLargo(recibo.periodoFacturado),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${empresa.nombre} · ${empresa.identificador} ${recibo.identificador ?? ''}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${formatearNumero(recibo.consumoActual)} ${empresa.unidad}',
-                    style: TextStyle(fontSize: 13, color: empresa.color, fontWeight: FontWeight.w600),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        formatearPesos(recibo.valorTotal),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${formatearNumero(recibo.consumoActual)} ${empresa.unidad}',
+                        style: TextStyle(fontSize: 13, color: empresa.color, fontWeight: FontWeight.w600),
+                      ),
+                    ],
                   ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: AppColors.border),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(child: EtiquetaEstadoPago(estado: EstadoPago.de(recibo))),
+                  const SizedBox(width: 8),
+                  if (recibo.id != null) BotonPago(recibo: recibo, onCambio: onPago),
                 ],
               ),
             ],

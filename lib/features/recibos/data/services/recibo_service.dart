@@ -127,6 +127,26 @@ class ReciboService {
     }
   }
 
+  /// Marca o desmarca el recibo como pagado. Sin [fechaPago], el servidor usa hoy.
+  Future<Recibo> marcarPago(
+    String id, {
+    required bool pagado,
+    DateTime? fechaPago,
+  }) async {
+    try {
+      final respuesta = await _spring.patch(
+        '${ApiConfig.recibosEndpoint}/$id/pago',
+        data: {
+          'pagado': pagado,
+          if (pagado && fechaPago != null) 'fechaPago': Recibo.iso(fechaPago),
+        },
+      );
+      return Recibo.fromJson(Map<String, dynamic>.from(respuesta.data as Map));
+    } on DioException catch (e) {
+      throw _errorSpring(e);
+    }
+  }
+
   Future<void> eliminar(String id) async {
     try {
       await _spring.delete('${ApiConfig.recibosEndpoint}/$id');

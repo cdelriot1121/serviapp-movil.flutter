@@ -160,6 +160,10 @@ class Recibo {
   final List<ConceptoValor> conceptos;
   final DateTime? fechaEscaneo;
 
+  /// Lo marca el usuario en la app o con el botón de la notificación.
+  final bool pagado;
+  final DateTime? fechaPago;
+
   const Recibo({
     this.id,
     required this.empresa,
@@ -183,6 +187,8 @@ class Recibo {
     this.historialConsumos = const [],
     this.conceptos = const [],
     this.fechaEscaneo,
+    this.pagado = false,
+    this.fechaPago,
   });
 
   factory Recibo.fromJson(Map<String, dynamic> json) {
@@ -222,8 +228,38 @@ class Recibo {
       fechaEscaneo: json['fechaEscaneo'] != null
           ? DateTime.tryParse(json['fechaEscaneo'] as String)?.toLocal()
           : null,
+      pagado: json['pagado'] as bool? ?? false,
+      fechaPago: _fecha(json['fechaPago']),
     );
   }
+
+  /// Copia del recibo con otro estado de pago.
+  Recibo conPago({required bool pagado, DateTime? fechaPago}) => Recibo(
+        id: id,
+        empresa: empresa,
+        identificador: identificador,
+        numeroFactura: numeroFactura,
+        titular: titular,
+        direccion: direccion,
+        barrio: barrio,
+        estrato: estrato,
+        periodoFacturado: periodoFacturado,
+        periodoInicio: periodoInicio,
+        periodoFin: periodoFin,
+        fechaEmision: fechaEmision,
+        fechaLimitePago: fechaLimitePago,
+        fechaSuspension: fechaSuspension,
+        valorTotal: valorTotal,
+        consumoActual: consumoActual,
+        lecturaAnterior: lecturaAnterior,
+        lecturaActual: lecturaActual,
+        diasFacturados: diasFacturados,
+        historialConsumos: historialConsumos,
+        conceptos: conceptos,
+        fechaEscaneo: fechaEscaneo,
+        pagado: pagado,
+        fechaPago: pagado ? fechaPago : null,
+      );
 
   Map<String, dynamic> toJson() => {
         'tipoServicio': empresa.tipoServicio,
@@ -242,11 +278,11 @@ class Recibo {
         'barrio': barrio,
         'estrato': estrato,
         'periodoFacturado': periodoFacturado,
-        'periodoInicio': _iso(periodoInicio),
-        'periodoFin': _iso(periodoFin),
-        'fechaEmision': _iso(fechaEmision),
-        'fechaLimitePago': _iso(fechaLimitePago),
-        'fechaSuspension': _iso(fechaSuspension),
+        'periodoInicio': iso(periodoInicio),
+        'periodoFin': iso(periodoFin),
+        'fechaEmision': iso(fechaEmision),
+        'fechaLimitePago': iso(fechaLimitePago),
+        'fechaSuspension': iso(fechaSuspension),
         'valorTotal': valorTotal,
         'unidadConsumo': empresa == Empresa.afinia ? 'kWh' : 'm3',
         'consumoActual': consumoActual,
@@ -260,7 +296,7 @@ class Recibo {
   static DateTime? _fecha(dynamic valor) =>
       valor is String ? DateTime.tryParse(valor) : null;
 
-  static String? _iso(DateTime? fecha) => fecha == null
+  static String? iso(DateTime? fecha) => fecha == null
       ? null
       : '${fecha.year.toString().padLeft(4, '0')}-'
           '${fecha.month.toString().padLeft(2, '0')}-'

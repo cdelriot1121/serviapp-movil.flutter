@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/boton_inicio.dart';
+import '../../../recordatorios/recordatorios_service.dart';
 import '../../data/models/recibo.dart';
 import '../../data/services/recibo_service.dart';
 import '../utils/formatos.dart';
@@ -258,6 +259,8 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
         camposCorregidos: _camposCorregidos(recibo),
         versionExtractor: widget.resultado.versionExtractor,
       );
+      // Programa los recordatorios de pago del recibo nuevo
+      await RecordatoriosService.actualizarRecibo(guardado);
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(

@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:serviapp/features/auth/presentation/views/home_screen.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../predio/presentation/registro_predio_screen.dart';
 import '../../data/services/auth_service.dart';
 import '../../data/services/biometric_service.dart';
+import '../views/recuperar_contrasena_screen.dart';
+import '../views/registro_screen.dart';
 
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key});
@@ -17,6 +20,7 @@ class _LoginFormState extends State<LoginForm> {
   // Controladores de los campos
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordFocus = FocusNode();
 
   // Servicio que conecta Flutter con Spring Boot
   final AuthService _authService = AuthService();
@@ -175,12 +179,13 @@ class _LoginFormState extends State<LoginForm> {
           if (!mounted) return;
         }
 
-        // Abrir pantalla nativa de bienvenida
+        // Sin predio registrado se pide antes de entrar (igual que la web)
+        final tienePredio = respuesta['tienePredio'] != false;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => HomeScreen(
-              nombre: nombre,
-            ),
+            builder: (context) => tienePredio
+                ? HomeScreen(nombre: nombre)
+                : RegistroPredioScreen(nombre: nombre),
           ),
         );
       } else {
@@ -281,6 +286,29 @@ class _LoginFormState extends State<LoginForm> {
     }
   }
 
+  // Crear cuenta: al volver trae el correo para iniciar sesión
+  Future<void> _abrirRegistro() async {
+    final email = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const RegistroScreen()),
+    );
+    if (email == null || !mounted) return;
+
+    setState(() {
+      _emailController.text = email;
+      _passwordController.clear();
+      _showErrors = false;
+    });
+    _passwordFocus.requestFocus();
+  }
+
+  void _abrirRecuperarContrasena() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RecuperarContrasenaScreen(email: _emailController.text.trim()),
+      ),
+    );
+  }
+
   // Quita el prefijo "Exception: " de los errores
   String _limpiarMensaje(Object e) {
     String mensaje = e.toString();
@@ -324,6 +352,7 @@ class _LoginFormState extends State<LoginForm> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -398,6 +427,7 @@ class _LoginFormState extends State<LoginForm> {
                 // CONTRASEÑA
                 TextFormField(
                   controller: _passwordController,
+                  focusNode: _passwordFocus,
                   obscureText: _obscurePassword,
                   textInputAction: TextInputAction.done,
                   validator: _validatePassword,
@@ -452,16 +482,7 @@ class _LoginFormState extends State<LoginForm> {
                   alignment: Alignment.centerRight,
 
                   child: TextButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Próximamente podrás recuperar tu contraseña.',
-                          ),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    },
+                    onPressed: _isLoading ? null : _abrirRecuperarContrasena,
 
                     child: const Text(
                       '¿Olvidaste tu contraseña?',
@@ -558,6 +579,34 @@ class _LoginFormState extends State<LoginForm> {
                     ),
                   ),
                 ],
+
+                const SizedBox(height: 22),
+
+                // CREAR CUENTA
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text(
+                      '¿No tienes cuenta?',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _isLoading ? null : _abrirRegistro,
+                      child: const Text(
+                        'Regístrate',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),

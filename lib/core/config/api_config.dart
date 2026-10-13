@@ -40,4 +40,7 @@ class ApiConfig {
   // Endpoints de recibos
   static const String recibosEndpoint = '/api/mobile/recibos';
   static const String analizarReciboEndpoint = '/recibos/analizar';
+
+  // Endpoint del análisis de consumo (cálculo en Spring Boot)
+  static const String analisisEndpoint = '/api/mobile/analisis';
 }

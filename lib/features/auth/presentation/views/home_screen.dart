@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/services/auth_service.dart';
+import '../../../analisis/presentation/views/historial_analisis_screen.dart';
 import '../../../recibos/data/models/recibo.dart';
 import '../../../recibos/presentation/escanear_recibo.dart';
 import '../../../recibos/presentation/utils/estado_pago.dart';
@@ -369,6 +370,13 @@ class _HomeScreenState extends State<HomeScreen>
           title: 'Mis recibos',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const MisRecibosScreen()),
+          ),
+        ),
+        _ToolIcon(
+          icon: Icons.insights_rounded,
+          title: 'Historial de consumos',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const HistorialAnalisisScreen()),
           ),
         ),
       ],

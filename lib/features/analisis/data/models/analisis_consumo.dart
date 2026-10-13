@@ -6,7 +6,6 @@ import '../../../recibos/data/models/recibo.dart';
 /// La app solo lo muestra.
 class AnalisisConsumo {
   final String id;
-  final String? reciboId;
   final String tipoServicio;
   final String? empresaCodigo;
   final String periodoFacturado;
@@ -29,7 +28,6 @@ class AnalisisConsumo {
 
   const AnalisisConsumo({
     required this.id,
-    required this.reciboId,
     required this.tipoServicio,
     required this.empresaCodigo,
     required this.periodoFacturado,
@@ -55,7 +53,6 @@ class AnalisisConsumo {
     double numero(String clave) => (json[clave] as num?)?.toDouble() ?? 0;
     return AnalisisConsumo(
       id: json['id'] as String,
-      reciboId: json['reciboId'] as String?,
       tipoServicio: json['tipoServicio'] as String? ?? '',
       empresaCodigo: json['empresa'] as String?,
       periodoFacturado: json['periodoFacturado'] as String? ?? '',

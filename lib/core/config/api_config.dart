@@ -36,8 +36,16 @@ class ApiConfig {
   static const String loginEndpoint = '/api/mobile/auth/login';
   static const String sessionEndpoint = '/api/mobile/auth/me';
   static const String logoutEndpoint = '/api/mobile/auth/logout';
+  static const String recuperarContrasenaEndpoint = '/api/mobile/auth/recuperar-contrasena';
+
+  // Endpoints del registro de usuarios y del predio
+  static const String registroEndpoint = '/api/mobile/registro';
+  static const String predioEndpoint = '/api/mobile/predio';
 
   // Endpoints de recibos
   static const String recibosEndpoint = '/api/mobile/recibos';
   static const String analizarReciboEndpoint = '/recibos/analizar';
+
+  // Endpoint del análisis de consumo (cálculo en Spring Boot)
+  static const String analisisEndpoint = '/api/mobile/analisis';
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/boton_inicio.dart';
+import '../../../analisis/presentation/views/analisis_consumo_screen.dart';
 import '../../../recordatorios/recordatorios_service.dart';
 import '../../data/models/recibo.dart';
 import '../../data/services/recibo_service.dart';
@@ -171,6 +172,17 @@ class _DetalleReciboScreenState extends State<DetalleReciboScreen> {
             if (_r.lecturaAnterior != null) _fila('Lectura anterior', formatearNumero(_r.lecturaAnterior)),
             if (_r.lecturaActual != null) _fila('Lectura actual', formatearNumero(_r.lecturaActual)),
             if (_r.diasFacturados != null) _fila('Días facturados', '${_r.diasFacturados}'),
+            if (_r.id != null && _r.consumoActual != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => AnalisisConsumoScreen(recibo: _r)),
+                  ),
+                  icon: const Icon(Icons.insights_rounded),
+                  label: const Text('Ver análisis de consumo'),
+                ),
+              ),
           ]),
           if (_r.conceptos.isNotEmpty)
             _tarjeta('Desglose del total', [

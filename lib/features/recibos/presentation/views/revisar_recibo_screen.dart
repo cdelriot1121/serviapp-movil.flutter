@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/boton_inicio.dart';
+import '../../../analisis/presentation/views/analisis_consumo_screen.dart';
 import '../../../recordatorios/recordatorios_service.dart';
 import '../../data/models/recibo.dart';
 import '../../data/services/recibo_service.dart';
@@ -262,9 +263,10 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
       // Programa los recordatorios de pago del recibo nuevo
       await RecordatoriosService.actualizarRecibo(guardado);
       if (!mounted) return;
+      // Spring analiza el consumo del recibo y se muestra de una vez
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => DetalleReciboScreen(recibo: guardado, recienGuardado: true),
+          builder: (_) => AnalisisConsumoScreen(recibo: guardado, recienGuardado: true),
         ),
       );
     } on ReciboException catch (e) {

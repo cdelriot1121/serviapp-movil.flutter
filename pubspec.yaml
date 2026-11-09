@@ -24,6 +24,7 @@ dependencies:
   timezone: ^0.11.2
   flutter_timezone: ^5.1.1
   shared_preferences: ^2.5.6
+  audioplayers: ^6.8.1
 
 dev_dependencies:
   flutter_test:
@@ -33,6 +34,18 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/audio/
+
+  # Montserrat es la tipografía del logotipo de ServiApp
+  fonts:
+    - family: Montserrat
+      fonts:
+        - asset: assets/fonts/Montserrat-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Montserrat-ExtraBold.ttf
+          weight: 800
 
 flutter_icons:
   android: true

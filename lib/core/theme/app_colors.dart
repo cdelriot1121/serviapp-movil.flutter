@@ -18,6 +18,7 @@ class AppColors {
   static const Color border = Color(0xFFDCE4EF);
 
   // Colores de identidad
+  static const Color logo = Color(0xFF38B6FF);
   static const Color green = Color(0xFF27A66B);
   static const Color orange = Color(0xFFFFAA25);
 }

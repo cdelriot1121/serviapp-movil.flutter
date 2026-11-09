@@ -41,13 +41,6 @@ String formatearFecha(DateTime? fecha) {
       '${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
 }
 
-/// "2026-09" -> "Sep 2026"
-String formatearPeriodoCorto(String? periodo) {
-  final p = Periodo.parse(periodo);
-  if (p == null) return periodo ?? '—';
-  return '${_mesesCortos[p.mes - 1]} ${p.anio}';
-}
-
 /// "2026-09" -> "Septiembre 2026"
 String formatearPeriodoLargo(String? periodo) {
   final p = Periodo.parse(periodo);

@@ -104,7 +104,7 @@ class _AnalisisConsumoScreenState extends State<AnalisisConsumoScreen> {
             child: const Text('Cancelar'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE5484D)),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.red),
             onPressed: () => Navigator.of(dialogo).pop(true),
             child: const Text('Eliminar'),
           ),
@@ -121,7 +121,7 @@ class _AnalisisConsumoScreenState extends State<AnalisisConsumoScreen> {
       if (!mounted) return;
       setState(() => _eliminando = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.mensaje), behavior: SnackBarBehavior.floating),
+        SnackBar(content: Text(e.mensaje)),
       );
     }
   }
@@ -143,11 +143,8 @@ class _AnalisisConsumoScreenState extends State<AnalisisConsumoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Análisis de consumo'),
-        backgroundColor: AppColors.background,
-        surfaceTintColor: Colors.transparent,
         actions: [
           // Solo desde el historial: quitarlo de la lista
           if (widget.analisis != null)

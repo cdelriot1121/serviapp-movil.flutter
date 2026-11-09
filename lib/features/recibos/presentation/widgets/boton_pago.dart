@@ -27,7 +27,7 @@ Future<Recibo?> cambiarPagoRecibo(
     return actualizado;
   } on ReciboException catch (e) {
     mensajero.showSnackBar(
-      SnackBar(content: Text(e.mensaje), behavior: SnackBarBehavior.floating),
+      SnackBar(content: Text(e.mensaje)),
     );
     return null;
   }
@@ -89,7 +89,6 @@ class _BotonPagoState extends State<BotonPago> {
             'Recibo de ${recibo.empresa.servicio.toLowerCase()} marcado como pagado. '
             'Ya no recibirás recordatorios.',
           ),
-          behavior: SnackBarBehavior.floating,
         ),
       );
     }

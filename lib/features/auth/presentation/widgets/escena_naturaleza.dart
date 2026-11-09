@@ -6,24 +6,6 @@ import 'package:flutter/scheduler.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../splash/presentation/painters/trazos.dart';
 
-/// Degradado cielo → agua → hoja de los encabezados de ServiApp.
-const degradadoNaturaleza = LinearGradient(
-  begin: Alignment.topLeft,
-  end: Alignment.bottomRight,
-  colors: [Color(0xFF2AA7E8), Color(0xFF22B39C), Color(0xFF2E9E5B)],
-  stops: [0, 0.55, 1],
-);
-
-/// Títulos con la tipografía del logo.
-TextStyle estiloTitulo(double tam, {Color color = AppColors.textPrimary}) =>
-    TextStyle(
-      fontFamily: 'Montserrat',
-      fontWeight: FontWeight.w800,
-      fontSize: tam,
-      color: color,
-      letterSpacing: -0.2,
-    );
-
 /// Segundos transcurridos desde que se abrió la pantalla; mueven la escena.
 mixin RelojEscena<T extends StatefulWidget>
     on SingleTickerProviderStateMixin<T> {
@@ -68,7 +50,7 @@ class EncabezadoNaturaleza extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(gradient: degradadoNaturaleza),
+      decoration: const BoxDecoration(gradient: AppColors.naturaleza),
       child: Stack(
         children: [
           Positioned.fill(

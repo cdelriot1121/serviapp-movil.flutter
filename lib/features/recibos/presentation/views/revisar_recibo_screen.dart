@@ -327,8 +327,6 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(mensaje),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.textPrimary,
       ),
     );
   }
@@ -394,11 +392,8 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
     final pendientes = _pendientes;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Revisa los datos'),
-        backgroundColor: AppColors.background,
-        surfaceTintColor: Colors.transparent,
         actions: [
           IconButton(
             tooltip: 'Ver foto',
@@ -700,7 +695,7 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
     final color = switch (estado) {
       _Estado.ok => AppColors.border,
       _Estado.revisar => AppColors.orange,
-      _Estado.falta => const Color(0xFFE5484D),
+      _Estado.falta => AppColors.red,
     };
     final borde = OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),

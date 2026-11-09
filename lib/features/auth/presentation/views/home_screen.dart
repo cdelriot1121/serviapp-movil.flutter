@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../data/services/auth_service.dart';
 import '../../../analisis/presentation/views/historial_analisis_screen.dart';
 import '../../../recibos/data/models/recibo.dart';
@@ -352,7 +353,7 @@ class _HomeScreenState extends State<HomeScreen>
           icon: Icons.document_scanner_outlined,
           title: 'Escanear recibo',
           tono: AppColors.logo,
-          colorIcono: AppColors.primary,
+          colorIcono: AppColors.sky,
           indice: 0,
           tiempo: tiempo,
           visible: _visible,
@@ -424,7 +425,7 @@ class _FilaPago extends StatelessWidget {
               border: Border.all(
                 color: urgente
                     ? estado.color.withValues(alpha: 0.45)
-                    : AppColors.borderSoft,
+                    : AppColors.border,
               ),
             ),
             child: Row(

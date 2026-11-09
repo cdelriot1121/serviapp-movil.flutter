@@ -79,8 +79,7 @@ class _RegistroPredioScreenState extends State<RegistroPredioScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.mensaje),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.red,
         ),
       );
     }
@@ -113,12 +112,9 @@ class _RegistroPredioScreenState extends State<RegistroPredioScreen> {
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: AppColors.background,
         appBar: AppBar(
           title: const Text('Registra tu predio'),
           automaticallyImplyLeading: false,
-          backgroundColor: AppColors.background,
-          surfaceTintColor: Colors.transparent,
           actions: [
             TextButton.icon(
               onPressed: _guardando ? null : _salir,
@@ -263,7 +259,7 @@ class _RegistroPredioScreenState extends State<RegistroPredioScreen> {
 
   Widget _error(String texto) => Padding(
         padding: const EdgeInsets.only(top: 6, left: 4),
-        child: Text(texto, style: TextStyle(fontSize: 12, color: Colors.red.shade700)),
+        child: Text(texto, style: TextStyle(fontSize: 12, color: AppColors.red)),
       );
 }
 

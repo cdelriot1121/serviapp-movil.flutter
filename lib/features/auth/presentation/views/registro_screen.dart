@@ -223,9 +223,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
       ..showSnackBar(
         SnackBar(
           content: Text(texto),
-          backgroundColor: error ? Colors.red.shade700 : null,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          backgroundColor: error ? AppColors.red : null,
         ),
       );
   }
@@ -241,11 +239,8 @@ class _RegistroScreenState extends State<RegistroScreen> {
         if (!salio && !_cargando) _cambiarCorreo();
       },
       child: Scaffold(
-        backgroundColor: AppColors.background,
         appBar: AppBar(
           title: const Text('Crear cuenta'),
-          backgroundColor: AppColors.background,
-          surfaceTintColor: Colors.transparent,
         ),
         body: SafeArea(
           child: SingleChildScrollView(
@@ -496,10 +491,10 @@ class _RequisitosPassword extends StatelessWidget {
     final cumplidos = requisitos.where((r) => r.cumple).length;
     final fuerza = cumplidos / requisitos.length;
     final color = fuerza < 0.5
-        ? const Color(0xFFEF4444)
+        ? AppColors.red
         : fuerza < 0.75
             ? const Color(0xFFF59E0B)
-            : const Color(0xFF10B981);
+            : AppColors.green;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -513,7 +508,7 @@ class _RequisitosPassword extends StatelessWidget {
               value: valor,
               minHeight: 6,
               color: color,
-              backgroundColor: const Color(0xFFE5E7EB),
+              backgroundColor: AppColors.border,
             ),
           ),
         ),
@@ -526,7 +521,7 @@ class _RequisitosPassword extends StatelessWidget {
                 Icon(
                   r.cumple ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
                   size: 17,
-                  color: r.cumple ? const Color(0xFF10B981) : AppColors.textSecondary,
+                  color: r.cumple ? AppColors.green : AppColors.textSecondary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -534,7 +529,7 @@ class _RequisitosPassword extends StatelessWidget {
                     r.texto,
                     style: TextStyle(
                       fontSize: 13,
-                      color: r.cumple ? const Color(0xFF10B981) : AppColors.textSecondary,
+                      color: r.cumple ? AppColors.green : AppColors.textSecondary,
                     ),
                   ),
                 ),

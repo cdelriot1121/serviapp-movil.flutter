@@ -16,6 +16,7 @@ class AppColors {
 
   // Bordes
   static const Color border = Color(0xFFDCE4EF);
+  static const Color borderSoft = Color(0xFFE6EEE1);
 
   // Colores de identidad
   static const Color logo = Color(0xFF38B6FF);

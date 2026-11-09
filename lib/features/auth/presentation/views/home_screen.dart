@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/services/auth_service.dart';
@@ -15,24 +14,8 @@ import '../../../recibos/presentation/views/mis_recibos_screen.dart';
 import '../../../recibos/presentation/widgets/boton_pago.dart';
 import '../../../recordatorios/recordatorios_service.dart';
 import '../../../splash/presentation/painters/trazos.dart';
+import '../widgets/escena_naturaleza.dart';
 import 'login_screen.dart';
-
-// Tonos del encabezado: cielo, agua y hoja.
-const _cielo = Color(0xFF2AA7E8);
-const _turquesa = Color(0xFF22B39C);
-const _hojaProfunda = Color(0xFF2E9E5B);
-
-// Borde suave de las tarjetas sobre el fondo crema.
-const _bordeSuave = Color(0xFFE6EEE1);
-
-TextStyle _titulo(double tam, {Color color = AppColors.textPrimary}) =>
-    TextStyle(
-      fontFamily: 'Montserrat',
-      fontWeight: FontWeight.w800,
-      fontSize: tam,
-      color: color,
-      letterSpacing: -0.2,
-    );
 
 class HomeScreen extends StatefulWidget {
   final String nombre;
@@ -44,10 +27,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
-  // Segundos transcurridos: mueve las hojas, el sol, el agua y los íconos.
-  final ValueNotifier<double> _tiempo = ValueNotifier(0);
-  late final Ticker _ticker;
+    with SingleTickerProviderStateMixin, RelojEscena {
   bool _visible = false;
 
   // Último recibo sin pagar de cada servicio (null mientras carga)
@@ -56,10 +36,6 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
-
-    _ticker = createTicker(
-      (transcurrido) => _tiempo.value = transcurrido.inMicroseconds / 1e6,
-    )..start();
 
     // Programa los recordatorios de pago y carga "Tus pagos".
     _iniciarRecordatorios();
@@ -92,8 +68,6 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void dispose() {
     RecordatoriosService.cambios.removeListener(_recargarPagos);
-    _ticker.dispose();
-    _tiempo.dispose();
     super.dispose();
   }
 
@@ -112,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen>
             height: 180,
             child: IgnorePointer(
               child: RepaintBoundary(
-                child: CustomPaint(painter: _ColinasPainter(_tiempo)),
+                child: CustomPaint(painter: _ColinasPainter(tiempo)),
               ),
             ),
           ),
@@ -147,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen>
                     children: [
                       Row(
                         children: [
-                          Text('¿Qué hacemos hoy?', style: _titulo(21)),
+                          Text('¿Qué hacemos hoy?', style: estiloTitulo(21)),
                           const SizedBox(width: 8),
                           const Icon(
                             Icons.eco_rounded,
@@ -238,103 +212,82 @@ class _HomeScreenState extends State<HomeScreen>
     final topPadding = MediaQuery.of(context).padding.top;
     final saludo = _saludo;
 
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [_cielo, _turquesa, _hojaProfunda],
-          stops: [0, 0.55, 1],
-        ),
-      ),
-      child: Stack(
-        children: [
-          // Sol, hojas que caen en cascada y agua en movimiento.
-          Positioned.fill(
-            child: IgnorePointer(
-              child: RepaintBoundary(
-                child: CustomPaint(painter: _NaturalezaPainter(_tiempo)),
-              ),
-            ),
-          ),
-
-          Padding(
-            padding: EdgeInsets.fromLTRB(26, topPadding + 22, 26, 74),
-            child: AnimatedSlide(
-              duration: const Duration(milliseconds: 700),
-              curve: Curves.easeOutCubic,
-              offset: _visible ? Offset.zero : const Offset(0, 0.08),
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 700),
-                opacity: _visible ? 1 : 0,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return EncabezadoNaturaleza(
+      tiempo: tiempo,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(26, topPadding + 22, 26, 74),
+        child: AnimatedSlide(
+          duration: const Duration(milliseconds: 700),
+          curve: Curves.easeOutCubic,
+          offset: _visible ? Offset.zero : const Offset(0, 0.08),
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 700),
+            opacity: _visible ? 1 : 0,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          'ServiApp',
-                          style: _titulo(23, color: Colors.white).copyWith(
-                            letterSpacing: 0.2,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withValues(alpha: 0.12),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Spacer(),
-                        _LogoutButton(onTap: _cerrarSesion),
-                      ],
-                    ),
-
-                    const SizedBox(height: 34),
-
-                    Row(
-                      children: [
-                        Icon(saludo.icono, color: AppColors.sun, size: 20),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            '${saludo.texto}, ${widget.nombre}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 10),
-
                     Text(
-                      'Tu hogar, en equilibrio',
-                      style: _titulo(26, color: Colors.white),
+                      'ServiApp',
+                      style: estiloTitulo(23, color: Colors.white).copyWith(
+                        letterSpacing: 0.2,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
                     ),
+                    const Spacer(),
+                    _LogoutButton(onTap: _cerrarSesion),
+                  ],
+                ),
 
-                    const SizedBox(height: 8),
+                const SizedBox(height: 34),
 
-                    Text(
-                      'Cuida tus servicios y ahorra con calma.',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        fontSize: 14,
-                        height: 1.5,
+                Row(
+                  children: [
+                    Icon(saludo.icono, color: AppColors.sun, size: 20),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        '${saludo.texto}, ${widget.nombre}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
-              ),
+
+                const SizedBox(height: 10),
+
+                Text(
+                  'Tu hogar, en equilibrio',
+                  style: estiloTitulo(26, color: Colors.white),
+                ),
+
+                const SizedBox(height: 8),
+
+                Text(
+                  'Cuida tus servicios y ahorra con calma.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -353,7 +306,7 @@ class _HomeScreenState extends State<HomeScreen>
         children: [
           Row(
             children: [
-              Text('Tus pagos', style: _titulo(19)),
+              Text('Tus pagos', style: estiloTitulo(19)),
               const SizedBox(width: 8),
               const Icon(
                 Icons.spa_rounded,
@@ -401,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen>
           tono: AppColors.logo,
           colorIcono: AppColors.primary,
           indice: 0,
-          tiempo: _tiempo,
+          tiempo: tiempo,
           visible: _visible,
           onTap: () => iniciarEscaneoRecibo(context),
         ),
@@ -411,7 +364,7 @@ class _HomeScreenState extends State<HomeScreen>
           tono: AppColors.leafLight,
           colorIcono: AppColors.green,
           indice: 1,
-          tiempo: _tiempo,
+          tiempo: tiempo,
           visible: _visible,
           onTap: () => Navigator.of(
             context,
@@ -423,7 +376,7 @@ class _HomeScreenState extends State<HomeScreen>
           tono: AppColors.sun,
           colorIcono: const Color(0xFFE08A00),
           indice: 2,
-          tiempo: _tiempo,
+          tiempo: tiempo,
           visible: _visible,
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const HistorialAnalisisScreen()),
@@ -471,7 +424,7 @@ class _FilaPago extends StatelessWidget {
               border: Border.all(
                 color: urgente
                     ? estado.color.withValues(alpha: 0.45)
-                    : _bordeSuave,
+                    : AppColors.borderSoft,
               ),
             ),
             child: Row(
@@ -696,164 +649,6 @@ class _ToolIconState extends State<_ToolIcon> {
       ),
     );
   }
-}
-
-// Hoja que cae: posición horizontal, velocidad, tamaño, vaivén y color.
-typedef _Hoja = ({
-  double x,
-  double velocidad,
-  double largo,
-  double vaiven,
-  double frecuencia,
-  double giro,
-  double fase,
-  double opacidad,
-  int tono,
-});
-
-// Degradados de las hojas: verde fresco, verde claro y amarillo sol.
-const _tonosHoja = [
-  (clara: AppColors.leafLight, oscura: AppColors.green),
-  (clara: Color(0xFFEAF8DD), oscura: AppColors.leafLight),
-  (clara: Color(0xFFFFE9A8), oscura: AppColors.sun),
-];
-
-// Sol que respira, hojas que caen en cascada y agua que se mece al final
-// del encabezado, fundiéndose con el fondo crema de la página.
-class _NaturalezaPainter extends CustomPainter {
-  _NaturalezaPainter(this.tiempo) : super(repaint: tiempo);
-
-  final ValueNotifier<double> tiempo;
-
-  static final List<_Hoja> _hojas = _generarHojas(20, 7);
-
-  static List<_Hoja> _generarHojas(int cantidad, int semilla) {
-    final azar = math.Random(semilla);
-    return List.generate(cantidad, (i) {
-      // Las más grandes están "más cerca": caen más rápido y se ven más.
-      final cercania = azar.nextDouble();
-      return (
-        x: (i + azar.nextDouble()) / cantidad,
-        velocidad: 16 + cercania * 26,
-        largo: 11 + cercania * 15,
-        vaiven: 10 + azar.nextDouble() * 18,
-        frecuencia: 0.5 + azar.nextDouble() * 0.6,
-        giro: (azar.nextBool() ? 1 : -1) * (0.15 + azar.nextDouble() * 0.35),
-        fase: azar.nextDouble(),
-        opacidad: 0.55 + cercania * 0.4,
-        tono: azar.nextInt(_tonosHoja.length),
-      );
-    });
-  }
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final t = tiempo.value;
-    final w = size.width;
-    final h = size.height;
-
-    // Sol cálido en la esquina, con un pulso lento.
-    final sol = Offset(w * 0.88, h * 0.06);
-    final pulso = 1 + 0.06 * math.sin(t * 0.8);
-    dibujarHalo(canvas, sol, 150 * pulso, AppColors.sun, 0.42);
-    dibujarHalo(canvas, sol, 60 * pulso, Colors.white, 0.35);
-
-    // Destellos de luz que flotan cerca del sol.
-    for (var k = 0; k < 4; k++) {
-      final brillo = math.sin(t * 0.9 + k * 1.7);
-      final punto = Offset(
-        w * (0.62 + 0.09 * k) + math.sin(t * 0.3 + k) * 6,
-        h * (0.12 + 0.11 * (k % 2)) + math.cos(t * 0.25 + k) * 4,
-      );
-      dibujarHalo(
-        canvas,
-        punto,
-        7 + 3 * k.toDouble(),
-        Colors.white,
-        0.10 + 0.08 * brillo,
-      );
-    }
-
-    // Hojas en cascada; desaparecen al tocar el agua.
-    final suelo = h - 30;
-    for (final hoja in _hojas) {
-      final recorrido = suelo + hoja.largo * 2;
-      final y =
-          (hoja.fase * recorrido + t * hoja.velocidad) % recorrido - hoja.largo;
-      final x =
-          hoja.x * w +
-          math.sin(t * hoja.frecuencia + hoja.fase * 2 * math.pi) * hoja.vaiven;
-      final angulo =
-          hoja.fase * 2 * math.pi +
-          math.sin(t * hoja.frecuencia * 0.9 + hoja.fase * 5) * 0.9 +
-          t * hoja.giro;
-      // El volteo simula la hoja girando en el aire.
-      final volteo =
-          0.45 +
-          0.55 * math.cos(t * hoja.frecuencia * 1.6 + hoja.fase * 9).abs();
-      final tono = _tonosHoja[hoja.tono];
-
-      canvas.save();
-      canvas.translate(x, y);
-      canvas.scale(volteo, 1);
-      dibujarHoja(
-        canvas,
-        Offset.zero,
-        hoja.largo,
-        angulo,
-        hoja.opacidad,
-        clara: tono.clara,
-        oscura: tono.oscura,
-      );
-      canvas.restore();
-    }
-
-    // Agua: una ola translúcida detrás y la crema de la página delante.
-    _ola(
-      canvas,
-      size,
-      base: h - 40,
-      amplitud: 8,
-      ondas: 1.3,
-      desfase: t * 0.7,
-      color: Colors.white.withValues(alpha: 0.22),
-    );
-    _ola(
-      canvas,
-      size,
-      base: h - 24,
-      amplitud: 7,
-      ondas: 1.1,
-      desfase: -t * 0.5 + 1.5,
-      color: AppColors.cream,
-    );
-  }
-
-  void _ola(
-    Canvas canvas,
-    Size size, {
-    required double base,
-    required double amplitud,
-    required double ondas,
-    required double desfase,
-    required Color color,
-  }) {
-    final camino = Path()..moveTo(0, size.height);
-    for (double x = 0; x <= size.width + 6; x += 6) {
-      final y =
-          base +
-          math.sin(x / size.width * 2 * math.pi * ondas + desfase) * amplitud;
-      camino.lineTo(x, y);
-    }
-    camino
-      ..lineTo(size.width, size.height)
-      ..close();
-    canvas.drawPath(camino, Paint()..color = color);
-  }
-
-  @override
-  bool shouldRepaint(covariant _NaturalezaPainter oldDelegate) =>
-      oldDelegate.tiempo != tiempo;
 }
 
 // Colinas verdes muy suaves al pie de la pantalla, con brotes que se mecen.

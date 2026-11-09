@@ -24,7 +24,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
 
-      // Colores generales: fondo crema y verde hoja como color principal
+      // Colores generales: fondo crema y el azul de ServiApp como principal
       scaffoldBackgroundColor: AppColors.cream,
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.primary,
@@ -94,16 +94,16 @@ class AppTheme {
         ),
       ),
 
-      // Avisos flotantes en verde bosque
+      // Avisos flotantes en azul profundo
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFF1F3A2E),
+        backgroundColor: const Color(0xFF14354D),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
         ),
       ),
 
-      // Estilo de campos de texto: borde suave y foco verde
+      // Estilo de campos de texto: borde suave y foco azul
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,

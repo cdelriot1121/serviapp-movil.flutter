@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Color principal: verde hoja con un toque de agua (botones, enlaces, foco)
-  static const Color primary = Color(0xFF1F9D6B);
+  // Color principal: el azul de ServiApp, un tono más profundo que el logo
+  // para que el texto blanco se lea bien (botones, enlaces, foco)
+  static const Color primary = Color(0xFF1B95DA);
 
   // Fondos
   static const Color cream = Color(0xFFFCF8EE);
@@ -13,7 +14,7 @@ class AppColors {
   static const Color textSecondary = Color(0xFF607086);
 
   // Bordes
-  static const Color border = Color(0xFFE6EEE1);
+  static const Color border = Color(0xFFE1EBF0);
 
   // Colores de identidad
   static const Color logo = Color(0xFF38B6FF);
@@ -26,11 +27,12 @@ class AppColors {
   // Errores, vencimientos y acciones destructivas
   static const Color red = Color(0xFFE5484D);
 
-  /// Degradado cielo → agua → hoja de los encabezados y el botón del login.
+  /// Degradado de los encabezados y el botón del login: domina el azul de
+  /// ServiApp y termina en agua y hoja.
   static const LinearGradient naturaleza = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [sky, Color(0xFF22B39C), Color(0xFF2E9E5B)],
-    stops: [0, 0.55, 1],
+    colors: [logo, sky, Color(0xFF22B39C), Color(0xFF2E9E5B)],
+    stops: [0, 0.45, 0.82, 1],
   );
 }

@@ -168,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen>
         icon: const Icon(
           Icons.logout_rounded,
           size: 40,
-          color: AppColors.green,
+          color: AppColors.primary,
         ),
         title: const Text('¿Cerrar sesión?'),
         content: const Text(
@@ -353,7 +353,7 @@ class _HomeScreenState extends State<HomeScreen>
           icon: Icons.document_scanner_outlined,
           title: 'Escanear recibo',
           tono: AppColors.logo,
-          colorIcono: AppColors.sky,
+          colorIcono: AppColors.primary,
           indice: 0,
           tiempo: tiempo,
           visible: _visible,
@@ -406,7 +406,7 @@ class _FilaPago extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.green.withValues(alpha: 0.08),
+            color: AppColors.primary.withValues(alpha: 0.08),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),

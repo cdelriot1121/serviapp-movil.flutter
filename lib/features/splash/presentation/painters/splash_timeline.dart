@@ -54,12 +54,12 @@ abstract final class Paleta {
   static const Color aguaOscura = Color(0xFF3E9FD6);
   static const Color espuma = Color(0xFFF2FBFF);
   static const Color blanco = Color(0xFFFFFFFF);
-  static const Color hojaClara = Color(0xFF9AD47F);
+  static const Color hojaClara = AppColors.leafLight;
   static const Color hoja = AppColors.green;
   static const Color gas = AppColors.orange;
-  static const Color energia = Color(0xFFF6C344);
+  static const Color energia = AppColors.sun;
   static const List<Color> cielo = [
-    Color(0xFFFCF8EE),
+    AppColors.cream,
     Color(0xFFEDF6FA),
     Color(0xFFD6EBF7),
     Color(0xFFBFE0F3),

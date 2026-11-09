@@ -86,8 +86,10 @@ void dibujarBurbuja(Canvas canvas, Offset centro, double radio, double opacidad)
   );
 }
 
-/// Hoja con nervadura central; [angulo] en radianes.
-void dibujarHoja(Canvas canvas, Offset centro, double largo, double angulo, double opacidad) {
+/// Hoja con nervadura central; [angulo] en radianes. [clara] y [oscura] son
+/// los extremos de su degradado (verde hoja por defecto).
+void dibujarHoja(Canvas canvas, Offset centro, double largo, double angulo, double opacidad,
+    {Color clara = Paleta.hojaClara, Color oscura = Paleta.hoja}) {
   if (opacidad <= 0.01 || largo <= 0.5) return;
   final m = largo / 2;
   canvas.save();
@@ -102,8 +104,8 @@ void dibujarHoja(Canvas canvas, Offset centro, double largo, double angulo, doub
     forma,
     Paint()
       ..shader = LinearGradient(colors: [
-        Paleta.hojaClara.withValues(alpha: opacidad),
-        Paleta.hoja.withValues(alpha: opacidad),
+        clara.withValues(alpha: opacidad),
+        oscura.withValues(alpha: opacidad),
       ]).createShader(Rect.fromLTRB(-m, -largo * 0.3, m, largo * 0.3)),
   );
   canvas.drawLine(

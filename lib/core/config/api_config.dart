@@ -41,6 +41,9 @@ class ApiConfig {
   static const String registroEndpoint = '/api/mobile/registro';
   static const String predioEndpoint = '/api/mobile/predio';
 
+  // Endpoint del perfil del usuario
+  static const String perfilEndpoint = '/api/mobile/perfil';
+
   // Endpoints de recibos
   static const String recibosEndpoint = '/api/mobile/recibos';
   static const String analizarReciboEndpoint = '/recibos/analizar';

@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/services/auth_service.dart';
 import '../../../analisis/presentation/views/historial_analisis_screen.dart';
+import '../../../perfil/presentation/perfil_screen.dart';
 import '../../../recibos/data/models/recibo.dart';
 import '../../../recibos/presentation/escanear_recibo.dart';
 import '../../../recibos/presentation/utils/estado_pago.dart';
@@ -30,6 +31,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin, RelojEscena {
   bool _visible = false;
+
+  // Se actualiza si el usuario cambia su nombre en el perfil
+  late String _nombre = widget.nombre;
 
   // Último recibo sin pagar de cada servicio (null mientras carga)
   List<Recibo>? _pendientes;
@@ -255,7 +259,7 @@ class _HomeScreenState extends State<HomeScreen>
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        '${saludo.texto}, ${widget.nombre}',
+                        '${saludo.texto}, $_nombre',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -338,53 +342,78 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  // Tres por fila; la última fila queda centrada.
   Widget _buildToolsMenu() {
-    return GridView.count(
-      crossAxisCount: 3,
-      crossAxisSpacing: 18,
-      mainAxisSpacing: 28,
-      mainAxisExtent: 140,
-      shrinkWrap: true,
-      primary: false,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      children: [
-        _ToolIcon(
-          icon: Icons.document_scanner_outlined,
-          title: 'Escanear recibo',
-          tono: AppColors.logo,
-          colorIcono: AppColors.primary,
-          indice: 0,
-          tiempo: tiempo,
-          visible: _visible,
-          onTap: () => iniciarEscaneoRecibo(context),
+    const espacio = 18.0;
+    return LayoutBuilder(
+      builder: (context, restricciones) {
+        final ancho = (restricciones.maxWidth - espacio * 2) / 3;
+        return Wrap(
+          alignment: WrapAlignment.center,
+          spacing: espacio,
+          runSpacing: 28,
+          children: [
+            for (final herramienta in _herramientas())
+              SizedBox(width: ancho, height: 140, child: herramienta),
+          ],
+        );
+      },
+    );
+  }
+
+  List<Widget> _herramientas() {
+    return [
+      _ToolIcon(
+        icon: Icons.document_scanner_outlined,
+        title: 'Escanear recibo',
+        tono: AppColors.logo,
+        colorIcono: AppColors.primary,
+        indice: 0,
+        tiempo: tiempo,
+        visible: _visible,
+        onTap: () => iniciarEscaneoRecibo(context),
+      ),
+      _ToolIcon(
+        icon: Icons.folder_copy_outlined,
+        title: 'Mis recibos',
+        tono: AppColors.leafLight,
+        colorIcono: AppColors.green,
+        indice: 1,
+        tiempo: tiempo,
+        visible: _visible,
+        onTap: () => Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const MisRecibosScreen())),
+      ),
+      _ToolIcon(
+        icon: Icons.insights_rounded,
+        title: 'Historial de consumos',
+        tono: AppColors.sun,
+        colorIcono: const Color(0xFFE08A00),
+        indice: 2,
+        tiempo: tiempo,
+        visible: _visible,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const HistorialAnalisisScreen()),
         ),
-        _ToolIcon(
-          icon: Icons.folder_copy_outlined,
-          title: 'Mis recibos',
-          tono: AppColors.leafLight,
-          colorIcono: AppColors.green,
-          indice: 1,
-          tiempo: tiempo,
-          visible: _visible,
-          onTap: () => Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => const MisRecibosScreen())),
-        ),
-        _ToolIcon(
-          icon: Icons.insights_rounded,
-          title: 'Historial de consumos',
-          tono: AppColors.sun,
-          colorIcono: const Color(0xFFE08A00),
-          indice: 2,
-          tiempo: tiempo,
-          visible: _visible,
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const HistorialAnalisisScreen()),
+      ),
+      _ToolIcon(
+        icon: Icons.account_circle_outlined,
+        title: 'Mi perfil',
+        tono: const Color(0xFF5FD3C0),
+        colorIcono: const Color(0xFF12917F),
+        indice: 3,
+        tiempo: tiempo,
+        visible: _visible,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PerfilScreen(
+              onNombreCambiado: (nombre) => setState(() => _nombre = nombre),
+            ),
           ),
         ),
-      ],
-    );
+      ),
+    ];
   }
 }
 

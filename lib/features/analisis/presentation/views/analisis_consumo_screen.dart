@@ -277,12 +277,15 @@ class _AnalisisConsumoScreenState extends State<AnalisisConsumoScreen> {
 }
 
 /// Pregunta cuántas personas viven en el hogar (1 a 30). null si se cancela.
+/// También lo usa el perfil para corregir los habitantes de un servicio.
 Future<int?> mostrarDialogoHabitantes(
   BuildContext context, {
   String? mensaje,
   Empresa? empresa,
+  int inicial = 1,
+  String confirmar = 'Analizar',
 }) {
-  var habitantes = 1;
+  var habitantes = inicial.clamp(1, 30);
   return showDialog<int>(
     context: context,
     builder: (dialogo) => StatefulBuilder(
@@ -333,7 +336,7 @@ Future<int?> mostrarDialogoHabitantes(
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogo).pop(habitantes),
-            child: const Text('Analizar'),
+            child: Text(confirmar),
           ),
         ],
       ),

@@ -1,9 +1,17 @@
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../data/services/auth_service.dart';
+import '../../../ahorros/presentation/views/mis_ahorros_screen.dart';
 import '../../../analisis/presentation/views/historial_analisis_screen.dart';
+import '../../../fallas/presentation/views/fallas_screen.dart';
+import '../../../notificaciones/data/aviso.dart';
+import '../../../notificaciones/notificaciones_service.dart';
+import '../../../notificaciones/presentation/notificaciones_screen.dart';
+import '../../../perfil/presentation/perfil_screen.dart';
 import '../../../recibos/data/models/recibo.dart';
 import '../../../recibos/presentation/escanear_recibo.dart';
 import '../../../recibos/presentation/utils/estado_pago.dart';
@@ -12,24 +20,25 @@ import '../../../recibos/presentation/views/detalle_recibo_screen.dart';
 import '../../../recibos/presentation/views/mis_recibos_screen.dart';
 import '../../../recibos/presentation/widgets/boton_pago.dart';
 import '../../../recordatorios/recordatorios_service.dart';
+import '../../../splash/presentation/painters/trazos.dart';
+import '../widgets/escena_naturaleza.dart';
 import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String nombre;
 
-  const HomeScreen({
-    super.key,
-    required this.nombre,
-  });
+  const HomeScreen({super.key, required this.nombre});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _animationController;
+    with SingleTickerProviderStateMixin, RelojEscena {
   bool _visible = false;
+
+  // Se actualiza si el usuario cambia su nombre en el perfil
+  late String _nombre = widget.nombre;
 
   // Último recibo sin pagar de cada servicio (null mientras carga)
   List<Recibo>? _pendientes;
@@ -38,22 +47,43 @@ class _HomeScreenState extends State<HomeScreen>
   void initState() {
     super.initState();
 
-    // Animación suave y continua del fondo.
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 12),
-    )..repeat();
-
     // Programa los recordatorios de pago y carga "Tus pagos".
     _iniciarRecordatorios();
     RecordatoriosService.cambios.addListener(_recargarPagos);
+
+    // Avisos de fallas y cortes del barrio (se revisan mientras la app está abierta)
+    NotificacionesService.iniciar();
+    NotificacionesService.toque.addListener(_abrirAviso);
 
     // Aparición inicial del contenido.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         setState(() => _visible = true);
+        // Por si la app se abrió tocando un aviso
+        _abrirAviso();
       }
     });
+  }
+
+  // Al tocar la notificación de un aviso se abre Fallas y cortes
+  void _abrirAviso() {
+    final toque = NotificacionesService.toque.value;
+    if (toque == null || !mounted) return;
+    NotificacionesService.toque.value = null;
+
+    if (toque.avisoId.isNotEmpty) {
+      AvisosApi()
+          .marcarLeida(toque.avisoId)
+          .then(NotificacionesService.actualizarNoLeidas)
+          .catchError((_) {});
+    }
+    final navegador = Navigator.of(context);
+    navegador.popUntil((r) => r.isFirst);
+    navegador.push(
+      MaterialPageRoute(
+        builder: (_) => FallasScreen(pestanaInicial: toque.tipo.esDeMisReportes ? 1 : 0),
+      ),
+    );
   }
 
   Future<void> _iniciarRecordatorios() async {
@@ -75,72 +105,95 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void dispose() {
     RecordatoriosService.cambios.removeListener(_recargarPagos);
-    _animationController.dispose();
+    NotificacionesService.toque.removeListener(_abrirAviso);
+    NotificacionesService.detener();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
+      backgroundColor: AppColors.cream,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Colinas suaves al fondo de la pantalla.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 180,
+            child: IgnorePointer(
+              child: RepaintBoundary(
+                child: CustomPaint(painter: _ColinasPainter(tiempo)),
+              ),
+            ),
+          ),
+          _buildContenido(),
+        ],
+      ),
+    );
+  }
 
-              const SizedBox(height: 34),
+  Widget _buildContenido() {
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
 
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 25),
-                child: AnimatedSlide(
+            const SizedBox(height: 14),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: AnimatedSlide(
+                duration: const Duration(milliseconds: 650),
+                curve: Curves.easeOutCubic,
+                offset: _visible ? Offset.zero : const Offset(0, 0.10),
+                child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 650),
-                  curve: Curves.easeOutCubic,
-                  offset: _visible
-                      ? Offset.zero
-                      : const Offset(0, 0.10),
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 650),
-                    opacity: _visible ? 1 : 0,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          '¿Qué hacemos hoy?',
-                          style: TextStyle(
-                            fontSize: 23,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                  opacity: _visible ? 1 : 0,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text('¿Qué hacemos hoy?', style: estiloTitulo(21)),
+                          const SizedBox(width: 8),
+                          const Icon(
+                            Icons.eco_rounded,
+                            color: AppColors.green,
+                            size: 22,
                           ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      const Text(
+                        'Estoy aquí para ayudarte. '
+                        'Elige qué te gustaría hacer.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.5,
+                          color: AppColors.textSecondary,
                         ),
+                      ),
 
-                        const SizedBox(height: 8),
+                      const SizedBox(height: 26),
 
-                        const Text(
-                          'Estoy aquí para ayudarte. '
-                          'Elige qué te gustaría hacer.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            height: 1.5,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
+                      // Menú de herramientas.
+                      _buildToolsMenu(),
 
-                        const SizedBox(height: 32),
-
-                        // Menú de herramientas.
-                        _buildToolsMenu(),
-
-                        _buildPagos(),
-                      ],
-                    ),
+                      _buildPagos(),
+                    ],
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -175,6 +228,8 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (confirmar != true || !mounted) return;
 
+    // Primero el push: quitar el celular de los avisos necesita la sesión
+    await NotificacionesService.alCerrarSesion();
     await RecordatoriosService.alCerrarSesion();
     await AuthService().logout();
     if (!mounted) return;
@@ -185,124 +240,101 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  ({String texto, IconData icono}) get _saludo {
+    final hora = DateTime.now().hour;
+    if (hora < 12) return (texto: 'Buenos días', icono: Icons.wb_sunny_rounded);
+    if (hora < 19) {
+      return (texto: 'Buenas tardes', icono: Icons.wb_twilight_rounded);
+    }
+    return (texto: 'Buenas noches', icono: Icons.nightlight_round);
+  }
+
   Widget _buildHeader() {
     final topPadding = MediaQuery.of(context).padding.top;
+    final saludo = _saludo;
 
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(
-        26,
-        topPadding + 28,
-        26,
-        38,
-      ),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF2D83F0),
-            Color(0xFF1550A3),
-            Color(0xFF103F83),
-          ],
-        ),
-        borderRadius: BorderRadius.vertical(
-          bottom: Radius.circular(32),
-        ),
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // Fondo decorativo animado.
-          Positioned.fill(
-            child: IgnorePointer(
-              child: AnimatedBuilder(
-                animation: _animationController,
-                builder: (context, child) {
-                  return CustomPaint(
-                    painter: _HeaderBackgroundPainter(
-                      progress: _animationController.value,
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-
-          // Contenido principal del header.
-          AnimatedSlide(
+    return EncabezadoNaturaleza(
+      tiempo: tiempo,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(26, topPadding + 22, 26, 74),
+        child: AnimatedSlide(
+          duration: const Duration(milliseconds: 700),
+          curve: Curves.easeOutCubic,
+          offset: _visible ? Offset.zero : const Offset(0, 0.08),
+          child: AnimatedOpacity(
             duration: const Duration(milliseconds: 700),
-            curve: Curves.easeOutCubic,
-            offset:
-                _visible ? Offset.zero : const Offset(0, 0.08),
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 700),
-              opacity: _visible ? 1 : 0,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.water_drop_outlined,
-                        color: Colors.white,
-                        size: 25,
+            opacity: _visible ? 1 : 0,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'ServiApp',
+                      style: estiloTitulo(23, color: Colors.white).copyWith(
+                        letterSpacing: 0.2,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 9),
-                      const Text(
-                        'ServiApp',
-                        style: TextStyle(
+                    ),
+                    const Spacer(),
+                    _BotonAvisos(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const NotificacionesScreen()),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _LogoutButton(onTap: _cerrarSesion),
+                  ],
+                ),
+
+                const SizedBox(height: 34),
+
+                Row(
+                  children: [
+                    Icon(saludo.icono, color: AppColors.sun, size: 20),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        '${saludo.texto}, $_nombre',
+                        style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 19,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.3,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const Spacer(),
-                      _LogoutButton(onTap: _cerrarSesion),
-                    ],
-                  ),
-
-                  const SizedBox(height: 37),
-
-                  Text(
-                    '¡Hola, ${widget.nombre}!',
-                    style: const TextStyle(
-                      color: Color(0xFFE4F1FF),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  ],
+                ),
+
+                const SizedBox(height: 10),
+
+                Text(
+                  'Tu hogar, en equilibrio',
+                  style: estiloTitulo(26, color: Colors.white),
+                ),
+
+                const SizedBox(height: 8),
+
+                Text(
+                  'Cuida tus servicios y ahorra con calma.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 14,
+                    height: 1.5,
                   ),
-
-                  const SizedBox(height: 10),
-
-                  const Text(
-                    'Tu espacio inteligente',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 27,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  const Text(
-                    'Tus servicios públicos, siempre a tu alcance.',
-                    style: TextStyle(
-                      color: Color(0xFFE0EDFF),
-                      fontSize: 14,
-                      height: 1.5,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -315,17 +347,20 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 28),
+      padding: const EdgeInsets.only(top: 12, bottom: 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Tus pagos',
-            style: TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
+          Row(
+            children: [
+              Text('Tus pagos', style: estiloTitulo(19)),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.spa_rounded,
+                color: AppColors.leafLight,
+                size: 20,
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           const Text(
@@ -342,45 +377,109 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
           ],
         ],
       ),
     );
   }
 
+  // Tres por fila; la última fila queda centrada.
   Widget _buildToolsMenu() {
-    return GridView.count(
-      crossAxisCount: 3,
-      crossAxisSpacing: 22,
-      mainAxisSpacing: 28,
-      mainAxisExtent: 140,
-      shrinkWrap: true,
-      primary: false,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      children: [
-        _ToolIcon(
-          icon: Icons.document_scanner_outlined,
-          title: 'Escanear recibo',
-          onTap: () => iniciarEscaneoRecibo(context),
-        ),
-        _ToolIcon(
-          icon: Icons.folder_copy_outlined,
-          title: 'Mis recibos',
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const MisRecibosScreen()),
-          ),
-        ),
-        _ToolIcon(
-          icon: Icons.insights_rounded,
-          title: 'Historial de consumos',
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const HistorialAnalisisScreen()),
-          ),
-        ),
-      ],
+    const espacio = 18.0;
+    return LayoutBuilder(
+      builder: (context, restricciones) {
+        final ancho = (restricciones.maxWidth - espacio * 2) / 3;
+        return Wrap(
+          alignment: WrapAlignment.center,
+          spacing: espacio,
+          runSpacing: 28,
+          children: [
+            for (final herramienta in _herramientas())
+              SizedBox(width: ancho, height: 140, child: herramienta),
+          ],
+        );
+      },
     );
+  }
+
+  List<Widget> _herramientas() {
+    return [
+      _ToolIcon(
+        icon: Icons.document_scanner_outlined,
+        title: 'Escanear recibo',
+        tono: AppColors.logo,
+        colorIcono: AppColors.primary,
+        indice: 0,
+        tiempo: tiempo,
+        visible: _visible,
+        onTap: () => iniciarEscaneoRecibo(context),
+      ),
+      _ToolIcon(
+        icon: Icons.folder_copy_outlined,
+        title: 'Mis recibos',
+        tono: AppColors.leafLight,
+        colorIcono: AppColors.green,
+        indice: 1,
+        tiempo: tiempo,
+        visible: _visible,
+        onTap: () => Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const MisRecibosScreen())),
+      ),
+      _ToolIcon(
+        icon: Icons.insights_rounded,
+        title: 'Historial de consumos',
+        tono: AppColors.sun,
+        colorIcono: const Color(0xFFE08A00),
+        indice: 2,
+        tiempo: tiempo,
+        visible: _visible,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const HistorialAnalisisScreen()),
+        ),
+      ),
+      _ToolIcon(
+        icon: Icons.savings_outlined,
+        title: 'Mis ahorros',
+        tono: const Color(0xFFFF9EB5),
+        colorIcono: const Color(0xFFD6336C),
+        indice: 3,
+        tiempo: tiempo,
+        visible: _visible,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const MisAhorrosScreen()),
+        ),
+      ),
+      _ToolIcon(
+        icon: Icons.report_problem_outlined,
+        title: 'Fallas y cortes',
+        tono: AppColors.orange,
+        colorIcono: const Color(0xFFD9480F),
+        indice: 4,
+        tiempo: tiempo,
+        visible: _visible,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const FallasScreen()),
+        ),
+      ),
+      _ToolIcon(
+        icon: Icons.account_circle_outlined,
+        title: 'Mi perfil',
+        tono: const Color(0xFF5FD3C0),
+        colorIcono: const Color(0xFF12917F),
+        indice: 5,
+        tiempo: tiempo,
+        visible: _visible,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PerfilScreen(
+              onNombreCambiado: (nombre) => setState(() => _nombre = nombre),
+            ),
+          ),
+        ),
+      ),
+    ];
   }
 }
 
@@ -395,57 +494,77 @@ class _FilaPago extends StatelessWidget {
   Widget build(BuildContext context) {
     final empresa = recibo.empresa;
     final estado = EstadoPago.de(recibo);
+    final urgente = estado.vencido || estado.dias == 0;
 
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: estado.vencido || estado.dias == 0
-                  ? estado.color.withValues(alpha: 0.45)
-                  : AppColors.border,
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: empresa.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Icon(empresa.icono, color: empresa.color, size: 22),
+        ],
+      ),
+      child: Material(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: urgente
+                    ? estado.color.withValues(alpha: 0.45)
+                    : AppColors.border,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${empresa.servicio} · ${formatearPesos(recibo.valorTotal)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        empresa.color.withValues(alpha: 0.10),
+                        empresa.color.withValues(alpha: 0.22),
+                      ],
                     ),
-                    const SizedBox(height: 3),
-                    EtiquetaEstadoPago(estado: estado),
-                  ],
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(empresa.icono, color: empresa.color, size: 22),
                 ),
-              ),
-              const SizedBox(width: 8),
-              BotonPago(recibo: recibo),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${empresa.servicio} · ${formatearPesos(recibo.valorTotal)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      EtiquetaEstadoPago(estado: estado),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                BotonPago(recibo: recibo),
+              ],
+            ),
           ),
         ),
       ),
@@ -453,7 +572,51 @@ class _FilaPago extends StatelessWidget {
   }
 }
 
-// Botón translúcido de cerrar sesión sobre el encabezado azul.
+// Campana de avisos con la cantidad sin leer.
+class _BotonAvisos extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _BotonAvisos({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: NotificacionesService.noLeidas,
+      builder: (context, noLeidas, _) => Tooltip(
+        message: noLeidas == 0 ? 'Avisos' : '$noLeidas avisos sin leer',
+        // El número va fuera del círculo para que no se recorte
+        child: Badge(
+          isLabelVisible: noLeidas > 0,
+          label: Text(noLeidas > 9 ? '9+' : '$noLeidas'),
+          backgroundColor: AppColors.red,
+          child: Material(
+            color: Colors.white.withValues(alpha: 0.18),
+            shape: CircleBorder(
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.32)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              child: SizedBox(
+                width: 38,
+                height: 38,
+                child: Icon(
+                  noLeidas > 0
+                      ? Icons.notifications_active_rounded
+                      : Icons.notifications_none_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Botón translúcido de cerrar sesión sobre el encabezado.
 class _LogoutButton extends StatelessWidget {
   final VoidCallback onTap;
 
@@ -464,9 +627,9 @@ class _LogoutButton extends StatelessWidget {
     return Tooltip(
       message: 'Cerrar sesión',
       child: Material(
-        color: Colors.white.withValues(alpha: 0.16),
+        color: Colors.white.withValues(alpha: 0.18),
         shape: StadiumBorder(
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.28)),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.32)),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -495,15 +658,25 @@ class _LogoutButton extends StatelessWidget {
   }
 }
 
-// Ícono de herramienta estilo aplicación móvil.
+// Herramienta con su propio tono de naturaleza: aparece escalonada y flota.
 class _ToolIcon extends StatefulWidget {
   final IconData icon;
   final String title;
+  final Color tono;
+  final Color colorIcono;
+  final int indice;
+  final ValueNotifier<double> tiempo;
+  final bool visible;
   final VoidCallback onTap;
 
   const _ToolIcon({
     required this.icon,
     required this.title,
+    required this.tono,
+    required this.colorIcono,
+    required this.indice,
+    required this.tiempo,
+    required this.visible,
     required this.onTap,
   });
 
@@ -516,154 +689,162 @@ class _ToolIconState extends State<_ToolIcon> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 105,
-      child: Column(
+    final tono = widget.tono;
+    final aparicion = Interval(
+      widget.indice * 0.14,
+      1,
+      curve: Curves.easeOutBack,
+    );
+
+    final tarjeta = Container(
+      width: 78,
+      height: 78,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(Colors.white, tono, 0.16)!,
+            Color.lerp(Colors.white, tono, 0.40)!,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: Colors.white, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: tono.withValues(alpha: 0.30),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          GestureDetector(
-            onTapDown: (_) => setState(() => _pressed = true),
-            onTapUp: (_) => setState(() => _pressed = false),
-            onTapCancel: () => setState(() => _pressed = false),
-            onTap: widget.onTap,
-            child: AnimatedScale(
-              duration: const Duration(milliseconds: 140),
-              curve: Curves.easeOut,
-              scale: _pressed ? 0.93 : 1.0,
-              child: Container(
-                width: 77,
-                height: 77,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFFE5F2FF),
-                      Color(0xFFCCE3FF),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(23),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(
-                        alpha: 0.10,
-                      ),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  widget.icon,
-                  color: AppColors.primary,
-                  size: 36,
-                ),
+          // Brillo suave, como luz de sol sobre la tarjeta.
+          Positioned(
+            top: 9,
+            left: 11,
+            child: Container(
+              width: 18,
+              height: 10,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
           ),
-
-          const SizedBox(height: 11),
-
-          Text(
-            widget.title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
+          Icon(widget.icon, color: widget.colorIcono, size: 35),
         ],
+      ),
+    );
+
+    return AnimatedScale(
+      duration: const Duration(milliseconds: 900),
+      curve: aparicion,
+      scale: widget.visible ? 1 : 0.6,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 900),
+        curve: Interval(widget.indice * 0.14, 1),
+        opacity: widget.visible ? 1 : 0,
+        child: Column(
+          children: [
+            GestureDetector(
+              onTapDown: (_) => setState(() => _pressed = true),
+              onTapUp: (_) => setState(() => _pressed = false),
+              onTapCancel: () => setState(() => _pressed = false),
+              onTap: widget.onTap,
+              child: AnimatedScale(
+                duration: const Duration(milliseconds: 140),
+                curve: Curves.easeOut,
+                scale: _pressed ? 0.92 : 1.0,
+                // Flota despacio, cada una a su ritmo.
+                child: ValueListenableBuilder<double>(
+                  valueListenable: widget.tiempo,
+                  builder: (context, t, child) => Transform.translate(
+                    offset: Offset(
+                      0,
+                      math.sin(t * 1.4 + widget.indice * 1.3) * 2.5,
+                    ),
+                    child: child,
+                  ),
+                  child: tarjeta,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            Text(
+              widget.title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-// Ondas y partículas animadas del encabezado.
-class _HeaderBackgroundPainter extends CustomPainter {
-  final double progress;
+// Colinas verdes muy suaves al pie de la pantalla, con brotes que se mecen.
+class _ColinasPainter extends CustomPainter {
+  _ColinasPainter(this.tiempo) : super(repaint: tiempo);
 
-  _HeaderBackgroundPainter({
-    required this.progress,
-  });
+  final ValueNotifier<double> tiempo;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final phase = progress * 2 * math.pi;
+    final t = tiempo.value;
+    final w = size.width;
+    final h = size.height;
 
-    // Círculos concéntricos decorativos.
-    final circlePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.10)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    final center = Offset(
-      size.width * 0.91,
-      size.height * 0.25,
+    final atras = Path()
+      ..moveTo(0, h * 0.55)
+      ..quadraticBezierTo(w * 0.28, h * 0.20, w * 0.62, h * 0.52)
+      ..quadraticBezierTo(w * 0.85, h * 0.72, w, h * 0.42)
+      ..lineTo(w, h)
+      ..lineTo(0, h)
+      ..close();
+    canvas.drawPath(
+      atras,
+      Paint()..color = AppColors.leafLight.withValues(alpha: 0.16),
     );
 
-    for (int i = 0; i < 4; i++) {
-      final radius =
-          43.0 + i * 23.0 + math.sin(phase) * 2.0;
+    final frente = Path()
+      ..moveTo(0, h * 0.78)
+      ..quadraticBezierTo(w * 0.35, h * 0.52, w * 0.7, h * 0.74)
+      ..quadraticBezierTo(w * 0.88, h * 0.84, w, h * 0.70)
+      ..lineTo(w, h)
+      ..lineTo(0, h)
+      ..close();
+    canvas.drawPath(
+      frente,
+      Paint()..color = AppColors.green.withValues(alpha: 0.10),
+    );
 
-      canvas.drawCircle(center, radius, circlePaint);
-    }
-
-    // Ondas suaves en el fondo.
-    for (int i = 0; i < 2; i++) {
-      final wavePaint = Paint()
-        ..color = Colors.white.withValues(
-          alpha: i == 0 ? 0.13 : 0.07,
-        )
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4;
-
-      final path = Path();
-
-      for (double x = 0; x <= size.width; x += 4) {
-        final y = size.height * (0.76 + i * 0.10) +
-            math.sin(
-              (x / size.width * 2 * math.pi) +
-                  phase +
-                  i,
-            ) *
-                10;
-
-        if (x == 0) {
-          path.moveTo(x, y);
-        } else {
-          path.lineTo(x, y);
-        }
-      }
-
-      canvas.drawPath(path, wavePaint);
-    }
-
-    // Pequeñas partículas luminosas.
-    final particles = [
-      Offset(size.width * 0.82, size.height * 0.15),
-      Offset(size.width * 0.68, size.height * 0.62),
-      Offset(size.width * 0.95, size.height * 0.78),
-    ];
-
-    for (int i = 0; i < particles.length; i++) {
-      final alpha =
-          0.18 + (math.sin(phase + i) + 1) * 0.12;
-
-      final particlePaint = Paint()
-        ..color = Colors.white.withValues(alpha: alpha);
-
-      canvas.drawCircle(
-        particles[i],
-        i == 0 ? 3.0 : 2.0,
-        particlePaint,
+    // Brotes sobre la colina trasera, meciéndose con la brisa.
+    const brotes = [(0.14, 0.43), (0.24, 0.36), (0.80, 0.60)];
+    for (var k = 0; k < brotes.length; k++) {
+      final (bx, by) = brotes[k];
+      final base = Offset(w * bx, h * by);
+      final brisa = math.sin(t * 1.1 + k * 1.4) * 0.12;
+      dibujarHoja(canvas, base + const Offset(6, -6), 16, -0.7 + brisa, 0.35);
+      dibujarHoja(
+        canvas,
+        base + const Offset(-6, -4),
+        13,
+        math.pi + 0.6 + brisa,
+        0.30,
       );
     }
   }
 
   @override
-  bool shouldRepaint(
-    covariant _HeaderBackgroundPainter oldDelegate,
-  ) {
-    return oldDelegate.progress != progress;
-  }
+  bool shouldRepaint(covariant _ColinasPainter oldDelegate) =>
+      oldDelegate.tiempo != tiempo;
 }

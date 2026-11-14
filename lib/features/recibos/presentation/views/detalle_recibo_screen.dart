@@ -74,7 +74,7 @@ class _DetalleReciboScreenState extends State<DetalleReciboScreen> {
             child: const Text('Cancelar'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE5484D)),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.red),
             onPressed: () => Navigator.of(dialogo).pop(true),
             child: const Text('Eliminar'),
           ),
@@ -92,7 +92,7 @@ class _DetalleReciboScreenState extends State<DetalleReciboScreen> {
       if (!mounted) return;
       setState(() => _eliminando = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.mensaje), behavior: SnackBarBehavior.floating),
+        SnackBar(content: Text(e.mensaje)),
       );
     }
   }
@@ -108,11 +108,8 @@ class _DetalleReciboScreenState extends State<DetalleReciboScreen> {
     final empresa = _r.empresa;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(formatearPeriodoLargo(_r.periodoFacturado)),
-        backgroundColor: AppColors.background,
-        surfaceTintColor: Colors.transparent,
         actions: [
           if (_r.id != null)
             IconButton(
@@ -328,7 +325,6 @@ class _DetalleReciboScreenState extends State<DetalleReciboScreen> {
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.green,
                 minimumSize: const Size.fromHeight(48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
               onPressed: () => _cambiarPago(pagado: true),
               icon: const Icon(Icons.check_circle_rounded),

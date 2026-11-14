@@ -100,11 +100,8 @@ class _AnalizandoReciboScreenState extends State<AnalizandoReciboScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Escanear recibo'),
-        backgroundColor: AppColors.background,
-        surfaceTintColor: Colors.transparent,
         actions: const [BotonInicio()],
       ),
       body: SafeArea(
@@ -194,7 +191,7 @@ class _AnalizandoReciboScreenState extends State<AnalizandoReciboScreen>
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.error_outline_rounded, color: Color(0xFFE5484D)),
+            const Icon(Icons.error_outline_rounded, color: AppColors.red),
             const SizedBox(width: 10),
             Expanded(
               child: Text(

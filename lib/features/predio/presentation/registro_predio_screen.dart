@@ -8,11 +8,18 @@ import '../data/predio_service.dart';
 
 /// Registro obligatorio del predio, igual que /registrar-predio-obligatorio
 /// de la web: sin predio no se puede usar la app. El estrato es el que usa
-/// el análisis de consumo.
+/// el análisis de consumo. Con [RegistroPredioScreen.editar] el mismo
+/// formulario edita el predio desde el perfil y devuelve el predio guardado.
 class RegistroPredioScreen extends StatefulWidget {
   final String nombre;
+  final Predio? predio;
 
-  const RegistroPredioScreen({super.key, required this.nombre});
+  const RegistroPredioScreen({super.key, required this.nombre}) : predio = null;
+
+  const RegistroPredioScreen.editar({super.key, required Predio this.predio})
+      : nombre = '';
+
+  bool get editando => predio != null;
 
   @override
   State<RegistroPredioScreen> createState() => _RegistroPredioScreenState();
@@ -36,6 +43,13 @@ class _RegistroPredioScreenState extends State<RegistroPredioScreen> {
   @override
   void initState() {
     super.initState();
+    final actual = widget.predio;
+    if (actual != null) {
+      _direccion.text = actual.direccion;
+      _barrio = actual.barrio;
+      _estrato = actual.estrato;
+      _tipo = actual.tipoPredio;
+    }
     _cargarOpciones();
   }
 
@@ -61,14 +75,21 @@ class _RegistroPredioScreenState extends State<RegistroPredioScreen> {
     if (!valido || _barrio == null || _estrato == null || _tipo == null) return;
     FocusScope.of(context).unfocus();
 
+    final predio = Predio(
+      direccion: _direccion.text.trim(),
+      barrio: _barrio!,
+      estrato: _estrato!,
+      tipoPredio: _tipo!,
+    );
+
     setState(() => _guardando = true);
     try {
-      await _service.registrar(
-        direccion: _direccion.text.trim(),
-        barrio: _barrio!,
-        estrato: _estrato!,
-        tipoPredio: _tipo!,
-      );
+      if (widget.editando) {
+        await _service.actualizar(predio);
+        if (mounted) Navigator.of(context).pop(predio);
+        return;
+      }
+      await _service.registrar(predio);
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => HomeScreen(nombre: widget.nombre)),
@@ -79,8 +100,7 @@ class _RegistroPredioScreenState extends State<RegistroPredioScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.mensaje),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.red,
         ),
       );
     }
@@ -103,28 +123,27 @@ class _RegistroPredioScreenState extends State<RegistroPredioScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (_) => _SelectorBarrio(barrios: barrios, seleccionado: _barrio),
+      builder: (_) => SelectorBarrio(barrios: barrios, seleccionado: _barrio),
     );
     if (elegido != null) setState(() => _barrio = elegido);
   }
 
   @override
   Widget build(BuildContext context) {
+    final editando = widget.editando;
     return PopScope(
-      canPop: false,
+      canPop: editando,
       child: Scaffold(
-        backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: const Text('Registra tu predio'),
-          automaticallyImplyLeading: false,
-          backgroundColor: AppColors.background,
-          surfaceTintColor: Colors.transparent,
+          title: Text(editando ? 'Editar mi predio' : 'Registra tu predio'),
+          automaticallyImplyLeading: editando,
           actions: [
-            TextButton.icon(
-              onPressed: _guardando ? null : _salir,
-              icon: const Icon(Icons.logout_rounded, size: 18),
-              label: const Text('Salir'),
-            ),
+            if (!editando)
+              TextButton.icon(
+                onPressed: _guardando ? null : _salir,
+                icon: const Icon(Icons.logout_rounded, size: 18),
+                label: const Text('Salir'),
+              ),
           ],
         ),
         body: SafeArea(child: _cuerpo()),
@@ -163,14 +182,17 @@ class _RegistroPredioScreenState extends State<RegistroPredioScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              '¡Hola, ${widget.nombre.split(' ').first}!',
+              widget.editando ? '¿Te mudaste?' : '¡Hola, ${widget.nombre.split(' ').first}!',
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Antes de empezar, cuéntanos dónde vives. Con tu estrato comparamos tu consumo '
-              'con el de hogares como el tuyo.',
-              style: TextStyle(fontSize: 14, height: 1.5, color: AppColors.textSecondary),
+            Text(
+              widget.editando
+                  ? 'Mantén tu predio al día: con tu estrato comparamos tu consumo '
+                      'con el de hogares como el tuyo.'
+                  : 'Antes de empezar, cuéntanos dónde vives. Con tu estrato comparamos tu consumo '
+                      'con el de hogares como el tuyo.',
+              style: const TextStyle(fontSize: 14, height: 1.5, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 26),
             TextFormField(
@@ -246,8 +268,14 @@ class _RegistroPredioScreenState extends State<RegistroPredioScreen> {
                         height: 22,
                         child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                       )
-                    : const Icon(Icons.home_rounded),
-                label: Text(_guardando ? 'Guardando…' : 'Registrar predio'),
+                    : Icon(widget.editando ? Icons.check_rounded : Icons.home_rounded),
+                label: Text(
+                  _guardando
+                      ? 'Guardando…'
+                      : widget.editando
+                          ? 'Guardar cambios'
+                          : 'Registrar predio',
+                ),
               ),
             ),
           ],
@@ -263,7 +291,7 @@ class _RegistroPredioScreenState extends State<RegistroPredioScreen> {
 
   Widget _error(String texto) => Padding(
         padding: const EdgeInsets.only(top: 6, left: 4),
-        child: Text(texto, style: TextStyle(fontSize: 12, color: Colors.red.shade700)),
+        child: Text(texto, style: TextStyle(fontSize: 12, color: AppColors.red)),
       );
 }
 
@@ -319,7 +347,7 @@ class _TarjetaTipo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final esCasa = tipo == 'CASA';
-    final texto = tipo[0] + tipo.substring(1).toLowerCase();
+    final texto = textoTipoPredio(tipo);
     return Material(
       color: seleccionado ? AppColors.primary.withValues(alpha: 0.08) : AppColors.surface,
       borderRadius: BorderRadius.circular(18),
@@ -360,17 +388,17 @@ class _TarjetaTipo extends StatelessWidget {
 }
 
 /// Lista de barrios con buscador (como el Select2 de la web).
-class _SelectorBarrio extends StatefulWidget {
+class SelectorBarrio extends StatefulWidget {
   final List<String> barrios;
   final String? seleccionado;
 
-  const _SelectorBarrio({required this.barrios, required this.seleccionado});
+  const SelectorBarrio({super.key, required this.barrios, required this.seleccionado});
 
   @override
-  State<_SelectorBarrio> createState() => _SelectorBarrioState();
+  State<SelectorBarrio> createState() => SelectorBarrioState();
 }
 
-class _SelectorBarrioState extends State<_SelectorBarrio> {
+class SelectorBarrioState extends State<SelectorBarrio> {
   String _busqueda = '';
 
   // Sin tildes ni mayúsculas para que "nariño" encuentre "NARIÑO" y "candelaria" a "LA CANDELARIA"

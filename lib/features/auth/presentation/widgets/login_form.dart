@@ -1,13 +1,14 @@
-
 import 'package:flutter/material.dart';
 import 'package:serviapp/features/auth/presentation/views/home_screen.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../admin/presentation/views/admin_dashboard_screen.dart';
 import '../../../predio/presentation/registro_predio_screen.dart';
 import '../../data/services/auth_service.dart';
 import '../../data/services/biometric_service.dart';
 import '../views/recuperar_contrasena_screen.dart';
 import '../views/registro_screen.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key});
@@ -66,9 +67,7 @@ class _LoginFormState extends State<LoginForm> {
       return 'Necesitamos tu correo para iniciar sesión';
     }
 
-    final emailRegex = RegExp(
-      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-    );
+    final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
     if (!emailRegex.hasMatch(email)) {
       return 'Revisa tu correo, parece que no está bien escrito';
@@ -89,8 +88,7 @@ class _LoginFormState extends State<LoginForm> {
   // Revisa si se puede entrar con huella y la pide automáticamente
   Future<void> _cargarEstadoHuella() async {
     final disponible = await _biometricService.isAvailable();
-    final activada =
-        disponible && await _biometricService.isEnabled();
+    final activada = disponible && await _biometricService.isEnabled();
 
     if (!mounted) return;
 
@@ -171,27 +169,31 @@ class _LoginFormState extends State<LoginForm> {
 
       // Comprobar que Spring Boot autenticó al usuario
       if (respuesta['autenticado'] == true) {
-        final nombre =
-            (respuesta['nombre'] ?? 'Usuario').toString();
+        final nombre = (respuesta['nombre'] ?? 'Usuario').toString();
 
         if (!conHuella) {
           await _gestionarHuellaTrasLogin(email, password);
           if (!mounted) return;
         }
 
+        // El rol lo decide Spring Security: el administrador solo ve el
+        // panel de estadísticas; el usuario, las funciones de siempre.
+        final esAdmin = respuesta['rol'] == 'ADMINISTRADOR';
+
         // Sin predio registrado se pide antes de entrar (igual que la web)
         final tienePredio = respuesta['tienePredio'] != false;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => tienePredio
+            builder: (context) => esAdmin
+                ? AdminDashboardScreen(nombre: nombre)
+                : tienePredio
                 ? HomeScreen(nombre: nombre)
                 : RegistroPredioScreen(nombre: nombre),
           ),
         );
       } else {
         _mostrarError(
-          respuesta['mensaje']?.toString() ??
-              'No se pudo iniciar sesión.',
+          respuesta['mensaje']?.toString() ?? 'No se pudo iniciar sesión.',
         );
       }
     } catch (e) {
@@ -200,8 +202,7 @@ class _LoginFormState extends State<LoginForm> {
       final mensaje = _limpiarMensaje(e);
 
       // Si la contraseña guardada ya no sirve, se desactiva la huella
-      if (conHuella &&
-          mensaje == 'Correo o contraseña incorrectos.') {
+      if (conHuella && mensaje == 'Correo o contraseña incorrectos.') {
         await _biometricService.disable();
         if (!mounted) return;
 
@@ -228,17 +229,11 @@ class _LoginFormState extends State<LoginForm> {
 
   // Después de un login con contraseña: ofrece activar la huella
   // o actualiza la contraseña guardada si ya estaba activada
-  Future<void> _gestionarHuellaTrasLogin(
-    String email,
-    String password,
-  ) async {
+  Future<void> _gestionarHuellaTrasLogin(String email, String password) async {
     if (!_huellaDisponible) return;
 
     if (_huellaActivada) {
-      await _biometricService.enable(
-        email: email,
-        password: password,
-      );
+      await _biometricService.enable(email: email, password: password);
       return;
     }
 
@@ -246,11 +241,7 @@ class _LoginFormState extends State<LoginForm> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        icon: const Icon(
-          Icons.fingerprint,
-          size: 48,
-          color: AppColors.primary,
-        ),
+        icon: const Icon(Icons.fingerprint, size: 48, color: AppColors.primary),
         title: const Text('¿Entrar con tu huella?'),
         content: const Text(
           'La próxima vez podrás iniciar sesión solo con tu '
@@ -277,10 +268,7 @@ class _LoginFormState extends State<LoginForm> {
       final confirmada = await _biometricService.confirmIdentity();
       if (!confirmada) return;
 
-      await _biometricService.enable(
-        email: email,
-        password: password,
-      );
+      await _biometricService.enable(email: email, password: password);
     } catch (_) {
       // Si falla, el usuario igual entra; solo no se activa la huella
     }
@@ -288,9 +276,9 @@ class _LoginFormState extends State<LoginForm> {
 
   // Crear cuenta: al volver trae el correo para iniciar sesión
   Future<void> _abrirRegistro() async {
-    final email = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const RegistroScreen()),
-    );
+    final email = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (_) => const RegistroScreen()));
     if (email == null || !mounted) return;
 
     setState(() {
@@ -304,7 +292,8 @@ class _LoginFormState extends State<LoginForm> {
   void _abrirRecuperarContrasena() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => RecuperarContrasenaScreen(email: _emailController.text.trim()),
+        builder: (_) =>
+            RecuperarContrasenaScreen(email: _emailController.text.trim()),
       ),
     );
   }
@@ -328,22 +317,13 @@ class _LoginFormState extends State<LoginForm> {
       SnackBar(
         content: Row(
           children: [
-            const Icon(
-              Icons.error_outline,
-              color: Colors.white,
-            ),
+            const Icon(Icons.error_outline, color: Colors.white),
             const SizedBox(width: 12),
-            Expanded(
-              child: Text(mensaje),
-            ),
+            Expanded(child: Text(mensaje)),
           ],
         ),
-        backgroundColor: Colors.red.shade700,
-        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.red,
         duration: const Duration(seconds: 4),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
       ),
     );
   }
@@ -361,9 +341,7 @@ class _LoginFormState extends State<LoginForm> {
     return AnimatedSlide(
       duration: const Duration(milliseconds: 650),
       curve: Curves.easeOutCubic,
-      offset: _isVisible
-          ? Offset.zero
-          : const Offset(0, 0.12),
+      offset: _isVisible ? Offset.zero : const Offset(0, 0.12),
 
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 650),
@@ -382,14 +360,7 @@ class _LoginFormState extends State<LoginForm> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // TÍTULO PRINCIPAL
-                const Text(
-                  'Iniciar sesión',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
+                Text('Iniciar sesión', style: estiloTitulo(24)),
 
                 const SizedBox(height: 8),
 
@@ -409,16 +380,12 @@ class _LoginFormState extends State<LoginForm> {
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                   validator: _validateEmail,
-                  autofillHints: const [
-                    AutofillHints.email,
-                  ],
+                  autofillHints: const [AutofillHints.email],
 
                   decoration: const InputDecoration(
                     labelText: 'Correo electrónico',
                     hintText: 'ejemplo@correo.com',
-                    prefixIcon: Icon(
-                      Icons.email_outlined,
-                    ),
+                    prefixIcon: Icon(Icons.email_outlined),
                   ),
                 ),
 
@@ -431,9 +398,7 @@ class _LoginFormState extends State<LoginForm> {
                   obscureText: _obscurePassword,
                   textInputAction: TextInputAction.done,
                   validator: _validatePassword,
-                  autofillHints: const [
-                    AutofillHints.password,
-                  ],
+                  autofillHints: const [AutofillHints.password],
 
                   onFieldSubmitted: (_) {
                     if (!_isLoading) {
@@ -444,9 +409,7 @@ class _LoginFormState extends State<LoginForm> {
                   decoration: InputDecoration(
                     labelText: 'Contraseña',
                     hintText: 'Ingresa tu contraseña',
-                    prefixIcon: const Icon(
-                      Icons.lock_outline,
-                    ),
+                    prefixIcon: const Icon(Icons.lock_outline),
 
                     suffixIcon: IconButton(
                       tooltip: _obscurePassword
@@ -454,9 +417,7 @@ class _LoginFormState extends State<LoginForm> {
                           : 'Ocultar contraseña',
 
                       icon: AnimatedSwitcher(
-                        duration: const Duration(
-                          milliseconds: 200,
-                        ),
+                        duration: const Duration(milliseconds: 200),
 
                         child: Icon(
                           _obscurePassword
@@ -498,17 +459,33 @@ class _LoginFormState extends State<LoginForm> {
                 const SizedBox(height: 24),
 
                 // BOTÓN ANIMADO DE INICIO DE SESIÓN
-                SizedBox(
+                Container(
                   width: double.infinity,
                   height: 56,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.naturaleza,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.18),
+                        blurRadius: 20,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
 
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _login,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      disabledBackgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      disabledForegroundColor: Colors.white,
+                    ),
 
                     child: AnimatedSwitcher(
-                      duration: const Duration(
-                        milliseconds: 300,
-                      ),
+                      duration: const Duration(milliseconds: 300),
 
                       transitionBuilder: (child, animation) {
                         return FadeTransition(
@@ -531,19 +508,14 @@ class _LoginFormState extends State<LoginForm> {
                                 strokeWidth: 2.5,
                               ),
                             )
-
                           : const Row(
                               key: ValueKey('login'),
-                              mainAxisAlignment:
-                                  MainAxisAlignment.center,
+                              mainAxisAlignment: MainAxisAlignment.center,
 
                               children: [
                                 Text('Iniciar sesión'),
                                 SizedBox(width: 10),
-                                Icon(
-                                  Icons.arrow_forward_rounded,
-                                  size: 20,
-                                ),
+                                Icon(Icons.arrow_forward_rounded, size: 20),
                               ],
                             ),
                     ),
@@ -559,23 +531,9 @@ class _LoginFormState extends State<LoginForm> {
                     height: 56,
 
                     child: OutlinedButton.icon(
-                      onPressed:
-                          _isLoading ? null : _loginConHuella,
-                      icon: const Icon(
-                        Icons.fingerprint,
-                        size: 26,
-                      ),
+                      onPressed: _isLoading ? null : _loginConHuella,
+                      icon: const Icon(Icons.fingerprint, size: 26),
                       label: const Text('Entrar con huella'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        side: const BorderSide(
-                          color: AppColors.primary,
-                          width: 1.4,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
                     ),
                   ),
                 ],
@@ -615,4 +573,3 @@ class _LoginFormState extends State<LoginForm> {
     );
   }
 }
-

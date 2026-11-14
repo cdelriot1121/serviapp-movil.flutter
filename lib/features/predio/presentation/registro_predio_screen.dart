@@ -123,7 +123,7 @@ class _RegistroPredioScreenState extends State<RegistroPredioScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (_) => _SelectorBarrio(barrios: barrios, seleccionado: _barrio),
+      builder: (_) => SelectorBarrio(barrios: barrios, seleccionado: _barrio),
     );
     if (elegido != null) setState(() => _barrio = elegido);
   }
@@ -388,17 +388,17 @@ class _TarjetaTipo extends StatelessWidget {
 }
 
 /// Lista de barrios con buscador (como el Select2 de la web).
-class _SelectorBarrio extends StatefulWidget {
+class SelectorBarrio extends StatefulWidget {
   final List<String> barrios;
   final String? seleccionado;
 
-  const _SelectorBarrio({required this.barrios, required this.seleccionado});
+  const SelectorBarrio({super.key, required this.barrios, required this.seleccionado});
 
   @override
-  State<_SelectorBarrio> createState() => _SelectorBarrioState();
+  State<SelectorBarrio> createState() => SelectorBarrioState();
 }
 
-class _SelectorBarrioState extends State<_SelectorBarrio> {
+class SelectorBarrioState extends State<SelectorBarrio> {
   String _busqueda = '';
 
   // Sin tildes ni mayúsculas para que "nariño" encuentre "NARIÑO" y "candelaria" a "LA CANDELARIA"

@@ -6,6 +6,10 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/services/auth_service.dart';
 import '../../../analisis/presentation/views/historial_analisis_screen.dart';
+import '../../../fallas/presentation/views/fallas_screen.dart';
+import '../../../notificaciones/data/aviso.dart';
+import '../../../notificaciones/notificaciones_service.dart';
+import '../../../notificaciones/presentation/notificaciones_screen.dart';
 import '../../../perfil/presentation/perfil_screen.dart';
 import '../../../recibos/data/models/recibo.dart';
 import '../../../recibos/presentation/escanear_recibo.dart';
@@ -46,12 +50,39 @@ class _HomeScreenState extends State<HomeScreen>
     _iniciarRecordatorios();
     RecordatoriosService.cambios.addListener(_recargarPagos);
 
+    // Avisos de fallas y cortes del barrio (se revisan mientras la app está abierta)
+    NotificacionesService.iniciar();
+    NotificacionesService.toque.addListener(_abrirAviso);
+
     // Aparición inicial del contenido.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         setState(() => _visible = true);
+        // Por si la app se abrió tocando un aviso
+        _abrirAviso();
       }
     });
+  }
+
+  // Al tocar la notificación de un aviso se abre Fallas y cortes
+  void _abrirAviso() {
+    final toque = NotificacionesService.toque.value;
+    if (toque == null || !mounted) return;
+    NotificacionesService.toque.value = null;
+
+    if (toque.avisoId.isNotEmpty) {
+      AvisosApi()
+          .marcarLeida(toque.avisoId)
+          .then(NotificacionesService.actualizarNoLeidas)
+          .catchError((_) {});
+    }
+    final navegador = Navigator.of(context);
+    navegador.popUntil((r) => r.isFirst);
+    navegador.push(
+      MaterialPageRoute(
+        builder: (_) => FallasScreen(pestanaInicial: toque.tipo.esDeMisReportes ? 1 : 0),
+      ),
+    );
   }
 
   Future<void> _iniciarRecordatorios() async {
@@ -73,6 +104,8 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void dispose() {
     RecordatoriosService.cambios.removeListener(_recargarPagos);
+    NotificacionesService.toque.removeListener(_abrirAviso);
+    NotificacionesService.detener();
     super.dispose();
   }
 
@@ -194,6 +227,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (confirmar != true || !mounted) return;
 
+    NotificacionesService.alCerrarSesion();
     await RecordatoriosService.alCerrarSesion();
     await AuthService().logout();
     if (!mounted) return;
@@ -247,6 +281,12 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ),
                     const Spacer(),
+                    _BotonAvisos(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const NotificacionesScreen()),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     _LogoutButton(onTap: _cerrarSesion),
                   ],
                 ),
@@ -398,11 +438,23 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ),
       _ToolIcon(
+        icon: Icons.report_problem_outlined,
+        title: 'Fallas y cortes',
+        tono: AppColors.orange,
+        colorIcono: const Color(0xFFD9480F),
+        indice: 3,
+        tiempo: tiempo,
+        visible: _visible,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const FallasScreen()),
+        ),
+      ),
+      _ToolIcon(
         icon: Icons.account_circle_outlined,
         title: 'Mi perfil',
         tono: const Color(0xFF5FD3C0),
         colorIcono: const Color(0xFF12917F),
-        indice: 3,
+        indice: 4,
         tiempo: tiempo,
         visible: _visible,
         onTap: () => Navigator.of(context).push(
@@ -498,6 +550,50 @@ class _FilaPago extends StatelessWidget {
                 const SizedBox(width: 8),
                 BotonPago(recibo: recibo),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Campana de avisos con la cantidad sin leer.
+class _BotonAvisos extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _BotonAvisos({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: NotificacionesService.noLeidas,
+      builder: (context, noLeidas, _) => Tooltip(
+        message: noLeidas == 0 ? 'Avisos' : '$noLeidas avisos sin leer',
+        // El número va fuera del círculo para que no se recorte
+        child: Badge(
+          isLabelVisible: noLeidas > 0,
+          label: Text(noLeidas > 9 ? '9+' : '$noLeidas'),
+          backgroundColor: AppColors.red,
+          child: Material(
+            color: Colors.white.withValues(alpha: 0.18),
+            shape: CircleBorder(
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.32)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              child: SizedBox(
+                width: 38,
+                height: 38,
+                child: Icon(
+                  noLeidas > 0
+                      ? Icons.notifications_active_rounded
+                      : Icons.notifications_none_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
             ),
           ),
         ),

@@ -14,6 +14,7 @@ import '../../../recordatorios/recordatorios_service.dart';
 import '../../data/models/estadisticas.dart';
 import '../../data/services/admin_service.dart';
 import '../widgets/graficas.dart';
+import 'admin_fallas_screen.dart';
 
 /// Panel de los administradores: solo estadísticas de ServiApp, sin datos
 /// personales. Se actualiza solo cada [intervalo] mientras está en pantalla.
@@ -260,6 +261,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   _PildoraBlanca(
                     icono: Icons.logout_rounded,
                     texto: 'Salir',
+                    tooltip: 'Cerrar sesión',
                     onTap: _cerrarSesion,
                   ),
                 ],
@@ -306,6 +308,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 tiempo: tiempo,
                 actualizado: _actualizado,
                 sinConexion: _sinConexion,
+              ),
+              const SizedBox(height: 14),
+              // Fallas que reportan los usuarios (cambiar su estado les avisa)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _PildoraBlanca(
+                  icono: Icons.report_problem_rounded,
+                  texto: 'Fallas reportadas',
+                  tooltip: 'Gestionar las fallas que reportan los usuarios',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AdminFallasScreen(),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -978,9 +995,15 @@ class _IndicadorEnVivo extends StatelessWidget {
 class _PildoraBlanca extends StatelessWidget {
   final IconData icono;
   final String texto;
+  final String? tooltip;
   final VoidCallback? onTap;
 
-  const _PildoraBlanca({required this.icono, required this.texto, this.onTap});
+  const _PildoraBlanca({
+    required this.icono,
+    required this.texto,
+    this.tooltip,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1012,7 +1035,7 @@ class _PildoraBlanca extends StatelessWidget {
       child: onTap == null
           ? contenido
           : Tooltip(
-              message: 'Cerrar sesión',
+              message: tooltip ?? texto,
               child: InkWell(onTap: onTap, child: contenido),
             ),
     );

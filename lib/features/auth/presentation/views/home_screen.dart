@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/services/auth_service.dart';
+import '../../../ahorros/presentation/views/mis_ahorros_screen.dart';
 import '../../../analisis/presentation/views/historial_analisis_screen.dart';
 import '../../../fallas/presentation/views/fallas_screen.dart';
 import '../../../notificaciones/data/aviso.dart';
@@ -438,11 +439,23 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ),
       _ToolIcon(
+        icon: Icons.savings_outlined,
+        title: 'Mis ahorros',
+        tono: const Color(0xFFFF9EB5),
+        colorIcono: const Color(0xFFD6336C),
+        indice: 3,
+        tiempo: tiempo,
+        visible: _visible,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const MisAhorrosScreen()),
+        ),
+      ),
+      _ToolIcon(
         icon: Icons.report_problem_outlined,
         title: 'Fallas y cortes',
         tono: AppColors.orange,
         colorIcono: const Color(0xFFD9480F),
-        indice: 3,
+        indice: 4,
         tiempo: tiempo,
         visible: _visible,
         onTap: () => Navigator.of(context).push(
@@ -454,7 +467,7 @@ class _HomeScreenState extends State<HomeScreen>
         title: 'Mi perfil',
         tono: const Color(0xFF5FD3C0),
         colorIcono: const Color(0xFF12917F),
-        indice: 4,
+        indice: 5,
         tiempo: tiempo,
         visible: _visible,
         onTap: () => Navigator.of(context).push(

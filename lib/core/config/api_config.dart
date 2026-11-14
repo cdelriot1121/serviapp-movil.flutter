@@ -51,6 +51,9 @@ class ApiConfig {
   // Endpoint del análisis de consumo (cálculo en Spring Boot)
   static const String analisisEndpoint = '/api/mobile/analisis';
 
+  // Gestor de ahorros (ahorro mes a mes calculado en Spring Boot)
+  static const String ahorrosEndpoint = '/api/mobile/ahorros';
+
   // Reporte de fallas (filtro por barrio) y avisos del usuario
   static const String fallasEndpoint = '/api/mobile/fallas';
   static const String notificacionesEndpoint = '/api/mobile/notificaciones';

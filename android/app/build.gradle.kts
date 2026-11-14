@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.serviapp"
+    namespace = "com.serviapp.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -17,8 +17,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.serviapp"
+        // Identificador de la app en Google Play y Firebase (no se puede cambiar después de publicar)
+        applicationId = "com.serviapp.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

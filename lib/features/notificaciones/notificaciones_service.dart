@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../fallas/data/services/fallas_service.dart';
 import 'data/aviso.dart';
+import 'push_service.dart';
 
 /// Toque en una notificación de aviso: qué abrir en la app.
 class ToqueAviso {
@@ -20,9 +22,10 @@ class ToqueAviso {
 ///
 /// Spring guarda un aviso para cada vecino del barrio cuando alguien reporta
 /// una falla (y cuando cambia el estado de un reporte o se programa un corte).
-/// Mientras hay sesión, la app pregunta por avisos nuevos cada [_intervalo] y
-/// al volver a primer plano, y los muestra con flutter_local_notifications.
-/// Los avisos que llegan con la app cerrada se muestran al iniciar sesión.
+/// Spring los envía al momento como push (PushService), aunque la app esté
+/// cerrada. Además la app pregunta por avisos nuevos al volver a primer plano
+/// (y cada [_intervalo] si el push no está activo) y los muestra con
+/// flutter_local_notifications, por si alguno no llegó por push.
 class NotificacionesService {
   NotificacionesService._();
 
@@ -51,6 +54,14 @@ class NotificacionesService {
   static _Ciclo? _ciclo;
   static bool _revisando = false;
 
+  static const _canal = AndroidNotificationChannel(
+    'avisos_barrio',
+    'Fallas y cortes en tu barrio',
+    description:
+        'Fallas que reportan tus vecinos, el estado de tus reportes y los cortes programados.',
+    importance: Importance.high,
+  );
+
   static const _detalles = NotificationDetails(
     android: AndroidNotificationDetails(
       'avisos_barrio',
@@ -73,8 +84,18 @@ class NotificacionesService {
     _ciclo = _Ciclo();
     WidgetsBinding.instance.addObserver(_ciclo!);
     _timer = Timer.periodic(_intervalo, (_) => revisar());
+    await _crearCanal();
     await _toqueAlAbrirLaApp();
     await revisar();
+
+    // Con push activo los avisos llegan solos: ya no hace falta preguntar
+    // cada 45 s. Se sigue revisando al abrir la app, por si alguno no llegó.
+    PushService.alRecibir = _alRecibirPush;
+    PushService.alTocar = alTocar;
+    if (await PushService.iniciar() && _ciclo != null) {
+      _timer?.cancel();
+      _timer = null;
+    }
   }
 
   static void detener() {
@@ -84,10 +105,51 @@ class NotificacionesService {
     _ciclo = null;
   }
 
-  static void alCerrarSesion() {
+  /// Antes de cerrar la sesión en Spring: este celular deja de recibir push.
+  static Future<void> alCerrarSesion() async {
     detener();
     noLeidas.value = 0;
     toque.value = null;
+    PushService.alRecibir = null;
+    PushService.alTocar = null;
+    await PushService.alCerrarSesion();
+  }
+
+  // El canal debe existir antes del primer push, que Android muestra solo
+  static Future<void> _crearCanal() async {
+    try {
+      await _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.createNotificationChannel(_canal);
+    } catch (e) {
+      debugPrint('No se pudo crear el canal de avisos: $e');
+    }
+  }
+
+  // Con la app abierta Android no muestra el push: se muestra como los demás avisos
+  static Future<void> _alRecibirPush(RemoteMessage mensaje) async {
+    final datos = mensaje.data;
+    if (datos['tipo'] != tipoPayload) return;
+    final avisoId = datos['avisoId']?.toString() ?? '';
+    try {
+      await _plugin.show(
+        id: _idDe(avisoId),
+        title: mensaje.notification?.title ?? 'Nuevo aviso en tu barrio',
+        body: mensaje.notification?.body ?? '',
+        notificationDetails: _detalles,
+        payload: jsonEncode({
+          'tipo': tipoPayload,
+          'avisoId': avisoId,
+          'tipoAviso': datos['tipoAviso'],
+        }),
+      );
+    } catch (e) {
+      debugPrint('No se pudo mostrar el aviso: $e');
+    }
+    noLeidas.value++;
+    cambios.value++;
   }
 
   // ------------------------------------------------------------- avisos
@@ -126,14 +188,20 @@ class NotificacionesService {
   static Future<void> _mostrar(List<Aviso> avisos) async {
     try {
       // Los más recientes como notificación propia; si llegan muchos, un resumen
-      final sueltas = avisos.length > _maxSueltas ? avisos.sublist(avisos.length - _maxSueltas) : avisos;
+      final sueltas = avisos.length > _maxSueltas
+          ? avisos.sublist(avisos.length - _maxSueltas)
+          : avisos;
       for (final a in sueltas) {
         await _plugin.show(
           id: _idDe(a.id),
           title: a.titulo,
           body: a.mensaje,
           notificationDetails: _detalles,
-          payload: jsonEncode({'tipo': tipoPayload, 'avisoId': a.id, 'tipoAviso': a.tipo.valor}),
+          payload: jsonEncode({
+            'tipo': tipoPayload,
+            'avisoId': a.id,
+            'tipoAviso': a.tipo.valor,
+          }),
         );
       }
       final resto = avisos.length - sueltas.length;
@@ -143,7 +211,10 @@ class NotificacionesService {
           title: 'Tienes $resto avisos más de tu barrio',
           body: 'Abre ServiApp para ver las fallas y cortes reportados.',
           notificationDetails: _detalles,
-          payload: jsonEncode({'tipo': tipoPayload, 'tipoAviso': TipoAviso.fallaBarrio.valor}),
+          payload: jsonEncode({
+            'tipo': tipoPayload,
+            'tipoAviso': TipoAviso.fallaBarrio.valor,
+          }),
         );
       }
     } catch (e) {

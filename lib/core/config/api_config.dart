@@ -58,6 +58,9 @@ class ApiConfig {
   static const String fallasEndpoint = '/api/mobile/fallas';
   static const String notificacionesEndpoint = '/api/mobile/notificaciones';
 
+  // Token del celular para los avisos push (Firebase Cloud Messaging)
+  static const String dispositivosEndpoint = '/api/mobile/dispositivos';
+
   // Panel de administradores (solo ROLE_ADMINISTRADOR)
   static const String adminEstadisticasEndpoint =
       '/api/mobile/admin/estadisticas';

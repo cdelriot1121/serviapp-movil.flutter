@@ -228,7 +228,8 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (confirmar != true || !mounted) return;
 
-    NotificacionesService.alCerrarSesion();
+    // Primero el push: quitar el celular de los avisos necesita la sesión
+    await NotificacionesService.alCerrarSesion();
     await RecordatoriosService.alCerrarSesion();
     await AuthService().logout();
     if (!mounted) return;

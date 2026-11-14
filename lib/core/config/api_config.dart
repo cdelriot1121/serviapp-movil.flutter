@@ -50,4 +50,8 @@ class ApiConfig {
 
   // Endpoint del análisis de consumo (cálculo en Spring Boot)
   static const String analisisEndpoint = '/api/mobile/analisis';
+
+  // Panel de administradores (solo ROLE_ADMINISTRADOR)
+  static const String adminEstadisticasEndpoint =
+      '/api/mobile/admin/estadisticas';
 }

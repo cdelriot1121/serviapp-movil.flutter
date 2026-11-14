@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:serviapp/features/auth/presentation/views/home_screen.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../admin/presentation/views/admin_dashboard_screen.dart';
 import '../../../predio/presentation/registro_predio_screen.dart';
 import '../../data/services/auth_service.dart';
 import '../../data/services/biometric_service.dart';
@@ -175,11 +176,17 @@ class _LoginFormState extends State<LoginForm> {
           if (!mounted) return;
         }
 
+        // El rol lo decide Spring Security: el administrador solo ve el
+        // panel de estadísticas; el usuario, las funciones de siempre.
+        final esAdmin = respuesta['rol'] == 'ADMINISTRADOR';
+
         // Sin predio registrado se pide antes de entrar (igual que la web)
         final tienePredio = respuesta['tienePredio'] != false;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => tienePredio
+            builder: (context) => esAdmin
+                ? AdminDashboardScreen(nombre: nombre)
+                : tienePredio
                 ? HomeScreen(nombre: nombre)
                 : RegistroPredioScreen(nombre: nombre),
           ),

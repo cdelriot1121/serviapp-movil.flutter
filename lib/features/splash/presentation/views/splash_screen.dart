@@ -16,7 +16,8 @@ import '../painters/splash_timeline.dart';
 ///
 /// El reloj de la animación sigue la posición real del audio: si el teléfono
 /// tarda en arrancar el sonido, la animación se ajusta suavemente para que
-/// cada letra coincida con su campanada. Tocar la pantalla salta la intro.
+/// cada letra coincida con su campanada. El botón "Omitir" (o tocar la
+/// pantalla) salta la intro y lleva directo al inicio de sesión.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -43,10 +44,17 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   bool _iniciado = false;
   bool _saliendo = false;
 
+  /// El botón Omitir aparece al poco de abrir, aunque el audio aún no arranque.
+  bool _mostrarOmitir = false;
+  Timer? _temporizadorOmitir;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _temporizadorOmitir = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) setState(() => _mostrarOmitir = true);
+    });
     _iniciar();
   }
 
@@ -127,6 +135,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _temporizadorOmitir?.cancel();
     _ticker.dispose();
     _posicionAudio?.cancel();
     _audio.dispose();
@@ -143,13 +152,84 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         backgroundColor: Paleta.cielo.first,
         body: Semantics(
           label: 'ServiApp',
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _iniciado ? _salir : null,
-            child: SizedBox.expand(
-              child: RepaintBoundary(
-                child: CustomPaint(painter: _fondo, foregroundPainter: _letras),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _iniciado ? _salir : null,
+                child: SizedBox.expand(
+                  child: RepaintBoundary(
+                    child: CustomPaint(painter: _fondo, foregroundPainter: _letras),
+                  ),
+                ),
               ),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 10, 16, 0),
+                    // Aparece al abrir y se va cuando el logo ya está formado (ahí la
+                    // intro está por terminar). No depende del audio: si el sonido
+                    // tarda en arrancar, igual se puede saltar.
+                    child: ValueListenableBuilder<double>(
+                      valueListenable: _tiempo,
+                      builder: (context, t, boton) {
+                        final visible = _mostrarOmitir && !_saliendo && t < Guion.impactoLogo;
+                        return AnimatedOpacity(
+                          opacity: visible ? 1 : 0,
+                          duration: const Duration(milliseconds: 400),
+                          child: IgnorePointer(ignoring: !visible, child: boton),
+                        );
+                      },
+                      child: _BotonOmitir(onTap: _salir),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Botón para saltar la intro e ir directo al inicio de sesión.
+class _BotonOmitir extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _BotonOmitir({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Omitir la intro',
+      excludeSemantics: true,
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.72),
+        shape: StadiumBorder(side: BorderSide(color: Paleta.palabra.withValues(alpha: 0.18))),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Omitir',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Paleta.palabra,
+                  ),
+                ),
+                SizedBox(width: 4),
+                Icon(Icons.skip_next_rounded, size: 20, color: Paleta.palabra),
+              ],
             ),
           ),
         ),

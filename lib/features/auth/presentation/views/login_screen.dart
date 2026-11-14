@@ -59,7 +59,7 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Tus servicios, en calma',
+                          'Bienvenido de nuevo',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.92),
                             fontSize: 15,

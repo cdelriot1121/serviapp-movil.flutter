@@ -79,17 +79,12 @@ class _MisRecibosScreenState extends State<MisRecibosScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Mis recibos'),
-        backgroundColor: AppColors.background,
-        surfaceTintColor: Colors.transparent,
         actions: const [BotonInicio()],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _escanear,
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
         icon: const Icon(Icons.document_scanner_outlined),
         label: const Text('Escanear'),
       ),

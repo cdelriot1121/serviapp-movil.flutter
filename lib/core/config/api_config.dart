@@ -34,7 +34,6 @@ class ApiConfig {
 
   // Endpoints de autenticación
   static const String loginEndpoint = '/api/mobile/auth/login';
-  static const String sessionEndpoint = '/api/mobile/auth/me';
   static const String logoutEndpoint = '/api/mobile/auth/logout';
   static const String recuperarContrasenaEndpoint = '/api/mobile/auth/recuperar-contrasena';
 
@@ -42,10 +41,28 @@ class ApiConfig {
   static const String registroEndpoint = '/api/mobile/registro';
   static const String predioEndpoint = '/api/mobile/predio';
 
+  // Endpoint del perfil del usuario
+  static const String perfilEndpoint = '/api/mobile/perfil';
+
   // Endpoints de recibos
   static const String recibosEndpoint = '/api/mobile/recibos';
   static const String analizarReciboEndpoint = '/recibos/analizar';
 
   // Endpoint del análisis de consumo (cálculo en Spring Boot)
   static const String analisisEndpoint = '/api/mobile/analisis';
+
+  // Gestor de ahorros (ahorro mes a mes calculado en Spring Boot)
+  static const String ahorrosEndpoint = '/api/mobile/ahorros';
+
+  // Reporte de fallas (filtro por barrio) y avisos del usuario
+  static const String fallasEndpoint = '/api/mobile/fallas';
+  static const String notificacionesEndpoint = '/api/mobile/notificaciones';
+
+  // Token del celular para los avisos push (Firebase Cloud Messaging)
+  static const String dispositivosEndpoint = '/api/mobile/dispositivos';
+
+  // Panel de administradores (solo ROLE_ADMINISTRADOR)
+  static const String adminEstadisticasEndpoint =
+      '/api/mobile/admin/estadisticas';
+  static const String adminFallasEndpoint = '/api/mobile/admin/fallas';
 }

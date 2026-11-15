@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "604437131574",
+    "project_id": "serviapp-6e524",
+    "storage_bucket": "serviapp-6e524.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:604437131574:android:b6b64ce6c222bce2ae4397",
+        "android_client_info": {
+          "package_name": "com.serviapp.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQMPOZl9mkNpJGETPFhtC9mEVNKebVeWI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

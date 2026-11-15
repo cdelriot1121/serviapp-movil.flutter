@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_colors.dart';
+
 /// Empresas soportadas por el escáner de recibos.
 enum Empresa {
   afinia(
@@ -30,7 +32,7 @@ enum Empresa {
     identificador: 'Contrato',
     unidad: 'm³',
     icono: Icons.local_fire_department_rounded,
-    color: Color(0xFFE5484D),
+    color: AppColors.red,
   );
 
   const Empresa({

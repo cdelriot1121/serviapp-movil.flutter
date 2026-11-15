@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Conexión con Spring Boot y FastAPI (debug lo agrega solo; release lo necesita aquí) -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Permiso para iniciar sesión con huella -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <!-- Recordatorios de pago: volver a programarlos al reiniciar el celular -->
@@ -41,6 +43,13 @@
         </receiver>
         <!-- Botones "Ya lo pagué" y "Recordar más tarde" -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
+        <!-- Avisos push (Firebase): mismo canal e ícono que las notificaciones locales de avisos -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="avisos_barrio" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

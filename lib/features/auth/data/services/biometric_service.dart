@@ -56,6 +56,18 @@ class BiometricService {
     await _storage.write(key: _passwordKey, value: password);
   }
 
+  /// Tras cambiar la contraseña en el perfil: si la huella está activa para
+  /// ese correo, guarda la nueva para que siga funcionando.
+  Future<void> actualizarPassword({
+    required String email,
+    required String password,
+  }) async {
+    final guardado = await _storage.read(key: _emailKey);
+    if (guardado != null && guardado.toLowerCase() == email.toLowerCase()) {
+      await _storage.write(key: _passwordKey, value: password);
+    }
+  }
+
   /// Borra las credenciales guardadas.
   Future<void> disable() async {
     await _storage.delete(key: _emailKey);

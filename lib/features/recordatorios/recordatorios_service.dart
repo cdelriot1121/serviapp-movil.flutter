@@ -9,6 +9,7 @@ import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../core/theme/app_colors.dart';
+import '../notificaciones/notificaciones_service.dart';
 import '../recibos/data/models/recibo.dart';
 import '../recibos/data/services/recibo_service.dart';
 import '../recibos/presentation/utils/formatos.dart';
@@ -290,6 +291,13 @@ class RecordatoriosService {
 
   static Future<void> _procesar(NotificationResponse respuesta, {required bool enApp}) async {
     final datos = _leerPayload(respuesta.payload);
+
+    // Avisos de fallas y cortes del barrio: se abren en la app
+    if (datos?['tipo'] == NotificacionesService.tipoPayload) {
+      if (enApp) NotificacionesService.alTocar(datos!);
+      return;
+    }
+
     final reciboId = datos?['reciboId'] as String?;
     if (datos == null || reciboId == null) return;
 

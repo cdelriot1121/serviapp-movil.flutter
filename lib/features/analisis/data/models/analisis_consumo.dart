@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_colors.dart';
+
 import '../../../recibos/data/models/recibo.dart';
 
 /// Análisis de consumo calculado por Spring Boot (mismo cálculo de la web).
@@ -95,11 +97,11 @@ class AnalisisConsumo {
 Color colorDeCategoria(String categoria) {
   switch (categoria) {
     case 'Bajo':
-      return const Color(0xFF27A66B);
+      return AppColors.green;
     case 'Moderado':
       return const Color(0xFFF59E0B);
     case 'Elevado':
-      return const Color(0xFFE5484D);
+      return AppColors.red;
   }
-  return const Color(0xFF607086);
+  return AppColors.textSecondary;
 }

@@ -4,8 +4,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../data/models/recibo.dart';
 import 'formatos.dart';
 
-const _rojo = Color(0xFFE5484D);
-
 /// Estado de pago de un recibo respecto a su fecha de pago oportuno.
 class EstadoPago {
   final String texto;
@@ -45,12 +43,12 @@ class EstadoPago {
       return EstadoPago._(
         dias == -1 ? 'Venció ayer' : 'Vencido hace ${-dias} días',
         Icons.error_rounded,
-        _rojo,
+        AppColors.red,
         dias,
       );
     }
     if (dias == 0) {
-      return EstadoPago._('Vence hoy', Icons.warning_rounded, _rojo, dias);
+      return EstadoPago._('Vence hoy', Icons.warning_rounded, AppColors.red, dias);
     }
     if (dias == 1) {
       return EstadoPago._('Vence mañana', Icons.warning_rounded, AppColors.orange, dias);

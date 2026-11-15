@@ -3,6 +3,43 @@ import 'package:dio/dio.dart';
 import '../../../core/config/api_config.dart';
 import '../../../core/network/api_client.dart';
 
+/// Predio del usuario, embebido en su documento de MongoDB.
+class Predio {
+  final String direccion;
+  final String barrio;
+  final int estrato;
+  final String tipoPredio;
+
+  const Predio({
+    required this.direccion,
+    required this.barrio,
+    required this.estrato,
+    required this.tipoPredio,
+  });
+
+  factory Predio.fromJson(Map<String, dynamic> json) {
+    return Predio(
+      direccion: json['direccion']?.toString() ?? '',
+      barrio: json['barrio']?.toString() ?? '',
+      estrato: (json['estrato'] as num?)?.toInt() ?? 0,
+      tipoPredio: json['tipoPredio']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'direccion': direccion,
+        'barrio': barrio,
+        'estrato': estrato,
+        'tipoPredio': tipoPredio,
+      };
+
+  String get tipoTexto => textoTipoPredio(tipoPredio);
+}
+
+/// CASA -> "Casa"
+String textoTipoPredio(String tipo) =>
+    tipo.isEmpty ? '' : tipo[0] + tipo.substring(1).toLowerCase();
+
 /// Opciones del formulario del predio, tal como las envía Spring Boot.
 class OpcionesPredio {
   final List<String> barrios;
@@ -33,7 +70,7 @@ class PredioException implements Exception {
   String toString() => mensaje;
 }
 
-/// Registro obligatorio del predio (igual que en la web).
+/// Registro y edición del predio (igual que en la web).
 class PredioService {
   final Dio _spring = ApiClient.dio;
 
@@ -46,19 +83,19 @@ class PredioService {
     }
   }
 
-  Future<void> registrar({
-    required String direccion,
-    required String barrio,
-    required int estrato,
-    required String tipoPredio,
-  }) async {
+  /// Registro obligatorio tras el primer inicio de sesión.
+  Future<void> registrar(Predio predio) async {
     try {
-      await _spring.post(ApiConfig.predioEndpoint, data: {
-        'direccion': direccion,
-        'barrio': barrio,
-        'estrato': estrato,
-        'tipoPredio': tipoPredio,
-      });
+      await _spring.post(ApiConfig.predioEndpoint, data: predio.toJson());
+    } on DioException catch (e) {
+      throw _error(e);
+    }
+  }
+
+  /// Edición desde el perfil.
+  Future<void> actualizar(Predio predio) async {
+    try {
+      await _spring.put(ApiConfig.predioEndpoint, data: predio.toJson());
     } on DioException catch (e) {
       throw _error(e);
     }

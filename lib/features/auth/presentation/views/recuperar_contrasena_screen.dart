@@ -45,8 +45,7 @@ class _RecuperarContrasenaScreenState extends State<RecuperarContrasenaScreen> {
         ..showSnackBar(
           SnackBar(
             content: Text(e.mensaje),
-            backgroundColor: Colors.red.shade700,
-            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.red,
           ),
         );
     } finally {
@@ -57,11 +56,8 @@ class _RecuperarContrasenaScreenState extends State<RecuperarContrasenaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Recuperar contraseña'),
-        backgroundColor: AppColors.background,
-        surfaceTintColor: Colors.transparent,
       ),
       body: SafeArea(
         child: SingleChildScrollView(

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../../core/theme/app_colors.dart';
 import 'views/analizando_recibo_screen.dart';
 import 'widgets/instrucciones_foto_sheet.dart';
 
@@ -32,8 +31,6 @@ Future<void> iniciarEscaneoRecibo(BuildContext context) async {
               ? 'ServiApp necesita permiso para usar la cámara.'
               : 'No fue posible abrir la cámara.',
         ),
-        backgroundColor: AppColors.textPrimary,
-        behavior: SnackBarBehavior.floating,
       ),
     );
     return;

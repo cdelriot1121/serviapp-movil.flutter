@@ -92,7 +92,7 @@ class _BotonMes extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: seleccionado ? AppColors.primary : AppColors.background,
+      color: seleccionado ? AppColors.primary : AppColors.cream,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),

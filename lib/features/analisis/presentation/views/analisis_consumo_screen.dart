@@ -104,7 +104,7 @@ class _AnalisisConsumoScreenState extends State<AnalisisConsumoScreen> {
             child: const Text('Cancelar'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE5484D)),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.red),
             onPressed: () => Navigator.of(dialogo).pop(true),
             child: const Text('Eliminar'),
           ),
@@ -121,7 +121,7 @@ class _AnalisisConsumoScreenState extends State<AnalisisConsumoScreen> {
       if (!mounted) return;
       setState(() => _eliminando = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.mensaje), behavior: SnackBarBehavior.floating),
+        SnackBar(content: Text(e.mensaje)),
       );
     }
   }
@@ -143,11 +143,8 @@ class _AnalisisConsumoScreenState extends State<AnalisisConsumoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Análisis de consumo'),
-        backgroundColor: AppColors.background,
-        surfaceTintColor: Colors.transparent,
         actions: [
           // Solo desde el historial: quitarlo de la lista
           if (widget.analisis != null)
@@ -280,12 +277,15 @@ class _AnalisisConsumoScreenState extends State<AnalisisConsumoScreen> {
 }
 
 /// Pregunta cuántas personas viven en el hogar (1 a 30). null si se cancela.
+/// También lo usa el perfil para corregir los habitantes de un servicio.
 Future<int?> mostrarDialogoHabitantes(
   BuildContext context, {
   String? mensaje,
   Empresa? empresa,
+  int inicial = 1,
+  String confirmar = 'Analizar',
 }) {
-  var habitantes = 1;
+  var habitantes = inicial.clamp(1, 30);
   return showDialog<int>(
     context: context,
     builder: (dialogo) => StatefulBuilder(
@@ -336,7 +336,7 @@ Future<int?> mostrarDialogoHabitantes(
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogo).pop(habitantes),
-            child: const Text('Analizar'),
+            child: Text(confirmar),
           ),
         ],
       ),

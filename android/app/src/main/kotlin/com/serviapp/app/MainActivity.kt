@@ -1,4 +1,4 @@
-package com.example.serviapp
+package com.serviapp.app
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

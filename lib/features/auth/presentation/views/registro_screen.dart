@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/services/auth_service.dart';
+import '../widgets/campos_cuenta.dart';
 
 /// Crear cuenta, con los mismos pasos de la web: datos → código enviado al
 /// correo → cuenta creada. Spring Boot valida todo y guarda el usuario en la
@@ -56,15 +57,6 @@ class _RegistroScreenState extends State<RegistroScreen> {
 
   // ------------------------------------------------------------ validaciones
 
-  String? _validarNombre(String? valor) {
-    final nombre = valor?.trim() ?? '';
-    if (nombre.isEmpty) return 'Ingresa tu nombre completo';
-    if (!RegExp(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$').hasMatch(nombre)) {
-      return 'Usa solo letras y espacios';
-    }
-    return null;
-  }
-
   String? _validarEmail(String? valor) {
     final email = valor?.trim() ?? '';
     if (email.isEmpty) return 'Ingresa tu correo electrónico';
@@ -74,12 +66,6 @@ class _RegistroScreenState extends State<RegistroScreen> {
     return null;
   }
 
-  String? _validarPassword(String? valor) {
-    if (_RequisitosPassword.de(valor ?? '').any((r) => !r.cumple)) {
-      return 'La contraseña no cumple todos los requisitos';
-    }
-    return null;
-  }
 
   // ------------------------------------------------------------ pasos
 
@@ -223,9 +209,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
       ..showSnackBar(
         SnackBar(
           content: Text(texto),
-          backgroundColor: error ? Colors.red.shade700 : null,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          backgroundColor: error ? AppColors.red : null,
         ),
       );
   }
@@ -241,11 +225,8 @@ class _RegistroScreenState extends State<RegistroScreen> {
         if (!salio && !_cargando) _cambiarCorreo();
       },
       child: Scaffold(
-        backgroundColor: AppColors.background,
         appBar: AppBar(
           title: const Text('Crear cuenta'),
-          backgroundColor: AppColors.background,
-          surfaceTintColor: Colors.transparent,
         ),
         body: SafeArea(
           child: SingleChildScrollView(
@@ -285,7 +266,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
             textCapitalization: TextCapitalization.words,
             textInputAction: TextInputAction.next,
             autofillHints: const [AutofillHints.name],
-            validator: _validarNombre,
+            validator: validarNombre,
             decoration: const InputDecoration(
               labelText: 'Nombre completo',
               prefixIcon: Icon(Icons.person_outline_rounded),
@@ -310,7 +291,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
             obscureText: _ocultarPassword,
             textInputAction: TextInputAction.done,
             autofillHints: const [AutofillHints.newPassword],
-            validator: _validarPassword,
+            validator: validarPassword,
             onFieldSubmitted: (_) => _cargando ? null : _enviarCodigo(),
             decoration: InputDecoration(
               labelText: 'Contraseña',
@@ -324,9 +305,9 @@ class _RegistroScreenState extends State<RegistroScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          _RequisitosPassword(password: _password.text),
+          RequisitosPassword(password: _password.text),
           const SizedBox(height: 28),
-          _BotonPrincipal(
+          BotonPrincipal(
             texto: 'Verificar correo',
             icono: Icons.mark_email_read_outlined,
             cargando: _cargando,
@@ -404,7 +385,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
           decoration: const InputDecoration(counterText: '', hintText: '••••••'),
         ),
         const SizedBox(height: 22),
-        _BotonPrincipal(
+        BotonPrincipal(
           texto: 'Verificar y crear cuenta',
           icono: Icons.how_to_reg_rounded,
           cargando: _cargando,
@@ -470,116 +451,6 @@ class _Pasos extends StatelessWidget {
         const SizedBox(width: 10),
         paso(1, '2. Verifica tu correo'),
       ],
-    );
-  }
-}
-
-/// Barra de fuerza y requisitos de la contraseña, como en la web.
-class _RequisitosPassword extends StatelessWidget {
-  final String password;
-
-  const _RequisitosPassword({required this.password});
-
-  static List<({String texto, bool cumple})> de(String password) => [
-        (texto: 'Mínimo 8 caracteres', cumple: password.length >= 8),
-        (texto: 'Al menos una mayúscula', cumple: RegExp(r'[A-Z]').hasMatch(password)),
-        (texto: 'Al menos un número', cumple: RegExp(r'[0-9]').hasMatch(password)),
-        (
-          texto: 'Al menos un carácter especial',
-          cumple: RegExp(r'''[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]''').hasMatch(password),
-        ),
-      ];
-
-  @override
-  Widget build(BuildContext context) {
-    final requisitos = de(password);
-    final cumplidos = requisitos.where((r) => r.cumple).length;
-    final fuerza = cumplidos / requisitos.length;
-    final color = fuerza < 0.5
-        ? const Color(0xFFEF4444)
-        : fuerza < 0.75
-            ? const Color(0xFFF59E0B)
-            : const Color(0xFF10B981);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(3),
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(end: fuerza),
-            duration: const Duration(milliseconds: 400),
-            builder: (_, valor, _) => LinearProgressIndicator(
-              value: valor,
-              minHeight: 6,
-              color: color,
-              backgroundColor: const Color(0xFFE5E7EB),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        for (final r in requisitos)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(
-              children: [
-                Icon(
-                  r.cumple ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                  size: 17,
-                  color: r.cumple ? const Color(0xFF10B981) : AppColors.textSecondary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    r.texto,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: r.cumple ? const Color(0xFF10B981) : AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _BotonPrincipal extends StatelessWidget {
-  final String texto;
-  final IconData icono;
-  final bool cargando;
-  final VoidCallback onPressed;
-
-  const _BotonPrincipal({
-    required this.texto,
-    required this.icono,
-    required this.cargando,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 56,
-      child: ElevatedButton(
-        onPressed: cargando ? null : onPressed,
-        child: cargando
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Flexible(child: Text(texto, overflow: TextOverflow.ellipsis)),
-                  const SizedBox(width: 10),
-                  Icon(icono, size: 20),
-                ],
-              ),
-      ),
     );
   }
 }

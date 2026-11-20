@@ -35,4 +35,15 @@ class ApiClient {
       },
     ),
   );
+
+  // Pronóstico del clima (Open-Meteo, sin llave). Va aparte y sin cookies
+  // para no mandarle la sesión de Spring a un servicio externo.
+  static final Dio clima = Dio(
+    BaseOptions(
+      baseUrl: 'https://api.open-meteo.com/v1',
+      connectTimeout: const Duration(seconds: 8),
+      receiveTimeout: const Duration(seconds: 10),
+      headers: {'Accept': 'application/json'},
+    ),
+  );
 }

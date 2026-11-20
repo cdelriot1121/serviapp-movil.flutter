@@ -48,6 +48,13 @@ class ApiConfig {
   static const String recibosEndpoint = '/api/mobile/recibos';
   static const String analizarReciboEndpoint = '/recibos/analizar';
 
+  // Predicción de consumo con la red neuronal LSTM (FastAPI):
+  // POST /api/predicciones/{energia|agua|gas} con {"usuarioId": "..."}
+  static const String prediccionesEndpoint = '/api/predicciones';
+
+  // Historial de predicciones (Spring Boot): GET lista, POST guarda una
+  static const String historialPrediccionesEndpoint = '/api/mobile/predicciones';
+
   // Endpoint del análisis de consumo (cálculo en Spring Boot)
   static const String analisisEndpoint = '/api/mobile/analisis';
 

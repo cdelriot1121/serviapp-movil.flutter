@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/boton_inicio.dart';
-import '../../../recibos/data/models/recibo.dart';
 import '../../../recibos/presentation/escanear_recibo.dart';
 import '../../../recibos/presentation/utils/formatos.dart';
+import '../../../recibos/presentation/widgets/filtro_servicios.dart';
 import '../../data/models/analisis_consumo.dart';
 import '../../data/services/analisis_service.dart';
 import 'analisis_consumo_screen.dart';
@@ -74,39 +74,12 @@ class _HistorialAnalisisScreenState extends State<HistorialAnalisisScreen> {
       ),
       body: Column(
         children: [
-          SizedBox(
-            height: 52,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              children: [
-                _chip(null, 'Todos', Icons.all_inbox_rounded, AppColors.primary),
-                for (final e in Empresa.values)
-                  _chip(e.tipoServicio, e.servicio, e.icono, e.color),
-              ],
-            ),
+          FiltroServicios(
+            seleccionado: _filtro,
+            onCambio: (tipo) => setState(() => _filtro = tipo),
           ),
           Expanded(child: _buildContenido()),
         ],
-      ),
-    );
-  }
-
-  Widget _chip(String? tipo, String texto, IconData icono, Color color) {
-    final seleccionado = _filtro == tipo;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        selected: seleccionado,
-        avatar: Icon(icono, size: 18, color: seleccionado ? Colors.white : color),
-        label: Text(texto),
-        showCheckmark: false,
-        selectedColor: color,
-        labelStyle: TextStyle(
-          color: seleccionado ? Colors.white : AppColors.textPrimary,
-          fontWeight: FontWeight.w600,
-        ),
-        onSelected: (_) => setState(() => _filtro = tipo),
       ),
     );
   }

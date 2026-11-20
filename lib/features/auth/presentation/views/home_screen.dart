@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/services/auth_service.dart';
+import '../../../admin/presentation/widgets/graficas.dart';
 import '../../../ahorros/presentation/views/mis_ahorros_screen.dart';
 import '../../../analisis/presentation/views/historial_analisis_screen.dart';
 import '../../../clima/data/clima_service.dart';
@@ -15,6 +16,7 @@ import '../../../notificaciones/data/aviso.dart';
 import '../../../notificaciones/notificaciones_service.dart';
 import '../../../notificaciones/presentation/notificaciones_screen.dart';
 import '../../../perfil/presentation/perfil_screen.dart';
+import '../../../predicciones/presentation/views/predecir_consumo_screen.dart';
 import '../../../recibos/data/models/recibo.dart';
 import '../../../recibos/presentation/escanear_recibo.dart';
 import '../../../recibos/presentation/utils/estado_pago.dart';
@@ -472,11 +474,23 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ),
       _ToolIcon(
+        icon: Icons.auto_graph_rounded,
+        title: 'Predecir consumo',
+        tono: const Color(0xFFB7AEFF),
+        colorIcono: ColoresPanel.violeta,
+        indice: 4,
+        tiempo: tiempo,
+        visible: _visible,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const PredecirConsumoScreen()),
+        ),
+      ),
+      _ToolIcon(
         icon: Icons.report_problem_outlined,
         title: 'Fallas y cortes',
         tono: AppColors.orange,
         colorIcono: const Color(0xFFD9480F),
-        indice: 4,
+        indice: 5,
         tiempo: tiempo,
         visible: _visible,
         onTap: () => Navigator.of(context).push(
@@ -488,7 +502,7 @@ class _HomeScreenState extends State<HomeScreen>
         title: 'Mi perfil',
         tono: const Color(0xFF5FD3C0),
         colorIcono: const Color(0xFF12917F),
-        indice: 5,
+        indice: 6,
         tiempo: tiempo,
         visible: _visible,
         onTap: () => Navigator.of(context).push(

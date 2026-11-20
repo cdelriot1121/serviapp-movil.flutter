@@ -34,6 +34,13 @@ String _miles(String digitos) {
   return '${negativo ? '-' : ''}$buffer';
 }
 
+/// 0.183 → "+18 %", -0.06 → "−6 %".
+String porcentaje(double fraccion) {
+  final valor = (fraccion * 100).round();
+  if (valor == 0) return '0 %';
+  return '${valor > 0 ? '+' : '−'}${valor.abs()} %';
+}
+
 /// DateTime -> "17/09/2026"
 String formatearFecha(DateTime? fecha) {
   if (fecha == null) return '—';

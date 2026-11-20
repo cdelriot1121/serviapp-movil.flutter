@@ -58,11 +58,13 @@ class ActividadPerfil {
   final int recibos;
   final int pagados;
   final int analisis;
+  final int predicciones;
 
   const ActividadPerfil({
     required this.recibos,
     required this.pagados,
     required this.analisis,
+    required this.predicciones,
   });
 
   factory ActividadPerfil.fromJson(Map<String, dynamic> json) {
@@ -71,6 +73,7 @@ class ActividadPerfil {
       recibos: numero('recibos'),
       pagados: numero('pagados'),
       analisis: numero('analisis'),
+      predicciones: numero('predicciones'),
     );
   }
 }

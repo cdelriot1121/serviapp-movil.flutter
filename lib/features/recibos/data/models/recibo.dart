@@ -140,6 +140,9 @@ class ConceptoValor {
 /// Datos de un recibo. Mismo formato en FastAPI (análisis) y Spring (guardado).
 class Recibo {
   final String? id;
+
+  /// Dueño del recibo (lo pone Spring). Lo pide FastAPI para predecir.
+  final String? usuarioId;
   final Empresa empresa;
   final String? identificador;
   final String? numeroFactura;
@@ -168,6 +171,7 @@ class Recibo {
 
   const Recibo({
     this.id,
+    this.usuarioId,
     required this.empresa,
     this.identificador,
     this.numeroFactura,
@@ -201,6 +205,7 @@ class Recibo {
     final identificador = json['identificador'] as Map<String, dynamic>?;
     return Recibo(
       id: json['id'] as String?,
+      usuarioId: json['usuarioId'] as String?,
       empresa: empresa,
       identificador: identificador?['valor'] as String?,
       numeroFactura: json['numeroFactura'] as String?,
@@ -238,6 +243,7 @@ class Recibo {
   /// Copia del recibo con otro estado de pago.
   Recibo conPago({required bool pagado, DateTime? fechaPago}) => Recibo(
         id: id,
+        usuarioId: usuarioId,
         empresa: empresa,
         identificador: identificador,
         numeroFactura: numeroFactura,

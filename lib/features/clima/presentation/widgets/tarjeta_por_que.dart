@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../recibos/data/models/recibo.dart';
+import '../../../recibos/presentation/utils/formatos.dart';
 import '../../data/explicacion_consumo.dart';
 import '../../data/pronostico.dart';
 import '../views/por_que_cambio_screen.dart';
@@ -38,13 +39,6 @@ extension EstiloExplicacion on ExplicacionConsumo {
       : subio
           ? '¿Por qué subió tu recibo?'
           : '¿Por qué bajó tu recibo?';
-}
-
-/// 0.183 → "+18 %", -0.06 → "−6 %".
-String porcentaje(double fraccion) {
-  final valor = (fraccion * 100).round();
-  if (valor == 0) return '0 %';
-  return '${valor > 0 ? '+' : '−'}${valor.abs()} %';
 }
 
 /// Tarjeta del detalle del recibo que lleva a "¿Por qué subió mi recibo?".

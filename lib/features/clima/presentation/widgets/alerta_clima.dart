@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/pronostico.dart';
 import 'clima_sheet.dart';
+import 'consejo_clima.dart';
 import 'consumos_del_dia.dart';
 
 /// Alerta de la primera entrada del día: qué clima viene y cómo afectará
@@ -113,7 +114,7 @@ class AlertaClima extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 14),
-                          _Consejo(texto: tipo.consejo, color: tipo.colores.last),
+                          ConsejoClima(texto: tipo.consejo, color: tipo.colores.last),
                           const SizedBox(height: 18),
                           ElevatedButton(
                             onPressed: () => Navigator.of(context).pop(false),
@@ -280,41 +281,4 @@ class _Circulo extends StatelessWidget {
           shape: BoxShape.circle,
         ),
       );
-}
-
-class _Consejo extends StatelessWidget {
-  final String texto;
-  final Color color;
-
-  const _Consejo({required this.texto, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 11, 14, 11),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.09),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.lightbulb_rounded, color: color, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              texto,
-              style: const TextStyle(
-                fontSize: 13,
-                height: 1.4,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

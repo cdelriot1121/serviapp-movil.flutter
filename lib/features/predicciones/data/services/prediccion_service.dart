@@ -18,9 +18,47 @@ class PrediccionException implements Exception {
 }
 
 /// Predicción del consumo del próximo mes. FastAPI pide a Spring los últimos
-/// 5 meses y los datos del hogar, y ejecuta la red neuronal LSTM.
+/// 5 meses y los datos del hogar, y ejecuta la red neuronal LSTM. El
+/// historial de predicciones se guarda en Spring.
 class PrediccionService {
   final Dio _fastApi = ApiClient.fastApi;
+  final Dio _spring = ApiClient.dio;
+
+  /// Guarda la predicción y la devuelve con la categoría del estrato.
+  Future<Prediccion> guardar(Prediccion prediccion) async {
+    try {
+      final respuesta = await _spring.post(
+        ApiConfig.historialPrediccionesEndpoint,
+        data: prediccion.toJson(),
+      );
+      return Prediccion.desdeSpring(Map<String, dynamic>.from(respuesta.data as Map));
+    } on DioException catch (e) {
+      throw _errorSpring(e);
+    } on FormatException {
+      throw const PrediccionException('No pudimos guardar la predicción en tu historial.');
+    }
+  }
+
+  Future<HistorialPredicciones> historial() async {
+    try {
+      final respuesta = await _spring.get(ApiConfig.historialPrediccionesEndpoint);
+      return HistorialPredicciones.fromJson(Map<String, dynamic>.from(respuesta.data as Map));
+    } on DioException catch (e) {
+      throw _errorSpring(e);
+    }
+  }
+
+  PrediccionException _errorSpring(DioException e) {
+    final status = e.response?.statusCode;
+    final datos = e.response?.data;
+    if (status == 401 || status == 403) {
+      return const PrediccionException('Tu sesión expiró. Cierra la app e inicia sesión de nuevo.');
+    }
+    if (datos is Map && datos['mensaje'] is String) {
+      return PrediccionException(datos['mensaje'] as String);
+    }
+    return const PrediccionException('No fue posible conectar con ServiApp. Intenta nuevamente.');
+  }
 
   Future<Prediccion> predecir({
     required Empresa empresa,

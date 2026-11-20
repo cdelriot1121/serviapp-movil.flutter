@@ -52,6 +52,9 @@ class ApiConfig {
   // POST /api/predicciones/{energia|agua|gas} con {"usuarioId": "..."}
   static const String prediccionesEndpoint = '/api/predicciones';
 
+  // Historial de predicciones (Spring Boot): GET lista, POST guarda una
+  static const String historialPrediccionesEndpoint = '/api/mobile/predicciones';
+
   // Endpoint del análisis de consumo (cálculo en Spring Boot)
   static const String analisisEndpoint = '/api/mobile/analisis';
 

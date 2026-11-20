@@ -25,7 +25,7 @@ const _respuesta = {
       'ultimoPeriodo': '2026-10',
     },
   ],
-  'actividad': {'recibos': 2, 'pagados': 1, 'analisis': 3},
+  'actividad': {'recibos': 2, 'pagados': 1, 'analisis': 3, 'predicciones': 4},
 };
 
 void main() {
@@ -39,6 +39,7 @@ void main() {
     expect(perfil.actividad.recibos, 2);
     expect(perfil.actividad.pagados, 1);
     expect(perfil.actividad.analisis, 3);
+    expect(perfil.actividad.predicciones, 4);
   });
 
   test('cada servicio trae los datos de su último recibo escaneado', () {
@@ -66,5 +67,7 @@ void main() {
     expect(perfil.predio, isNull);
     expect(perfil.miembroDesde, isNull);
     expect(perfil.servicios, isEmpty);
+    // Un Spring sin el conteo de predicciones da 0
+    expect(perfil.actividad.predicciones, 0);
   });
 }

@@ -6,6 +6,8 @@ import '../../analisis/presentation/views/analisis_consumo_screen.dart';
 import '../../auth/data/services/biometric_service.dart';
 import '../../auth/presentation/widgets/campos_cuenta.dart';
 import '../../auth/presentation/widgets/escena_naturaleza.dart';
+import '../../admin/presentation/widgets/graficas.dart';
+import '../../predicciones/presentation/views/historial_predicciones_screen.dart';
 import '../../predio/data/predio_service.dart';
 import '../../predio/presentation/registro_predio_screen.dart';
 import '../../recibos/presentation/utils/formatos.dart';
@@ -304,34 +306,54 @@ class _PerfilScreenState extends State<PerfilScreen>
   }
 
   Widget _actividad(ActividadPerfil actividad) {
-    return Row(
+    final datos = [
+      _Dato(
+        icono: Icons.receipt_long_rounded,
+        color: AppColors.primary,
+        valor: actividad.recibos,
+        texto: 'Recibos escaneados',
+      ),
+      _Dato(
+        icono: Icons.verified_rounded,
+        color: AppColors.green,
+        valor: actividad.pagados,
+        texto: 'Recibos pagados',
+      ),
+      _Dato(
+        icono: Icons.insights_rounded,
+        color: const Color(0xFFE08A00),
+        valor: actividad.analisis,
+        texto: 'Análisis de consumo',
+      ),
+      _Dato(
+        icono: Icons.auto_graph_rounded,
+        color: ColoresPanel.violeta,
+        valor: actividad.predicciones,
+        texto: 'Consumos predichos',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const HistorialPrediccionesScreen(),
+          ),
+        ),
+      ),
+    ];
+
+    // Dos por fila
+    return Column(
       children: [
-        Expanded(
-          child: _Dato(
-            icono: Icons.receipt_long_rounded,
-            color: AppColors.primary,
-            valor: actividad.recibos,
-            texto: 'Recibos escaneados',
+        for (var i = 0; i < datos.length; i += 2) ...[
+          if (i > 0) const SizedBox(height: 12),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: datos[i]),
+                const SizedBox(width: 12),
+                Expanded(child: datos[i + 1]),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _Dato(
-            icono: Icons.verified_rounded,
-            color: AppColors.green,
-            valor: actividad.pagados,
-            texto: 'Recibos pagados',
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _Dato(
-            icono: Icons.insights_rounded,
-            color: const Color(0xFFE08A00),
-            valor: actividad.analisis,
-            texto: 'Análisis de consumo',
-          ),
-        ),
+        ],
       ],
     );
   }
@@ -607,14 +629,12 @@ class _Seccion extends StatelessWidget {
 
 class _Tarjeta extends StatelessWidget {
   final Widget child;
-  final EdgeInsetsGeometry? padding;
 
-  const _Tarjeta({required this.child, this.padding});
+  const _Tarjeta({required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: padding,
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
@@ -639,36 +659,56 @@ class _Dato extends StatelessWidget {
   final int valor;
   final String texto;
 
+  /// Si llega, la tarjeta lleva a su detalle.
+  final VoidCallback? onTap;
+
   const _Dato({
     required this.icono,
     required this.color,
     required this.valor,
     required this.texto,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return _Tarjeta(
-      padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _IconoCirculo(icono: icono, color: color, tam: 36),
-          const SizedBox(height: 10),
-          Text('$valor', style: estiloTitulo(22)),
-          const SizedBox(height: 2),
-          Text(
-            texto,
-            maxLines: 2,
-            style: const TextStyle(
-              fontSize: 12,
-              height: 1.25,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+          child: _contenido(),
+        ),
       ),
+    );
+  }
+
+  Widget _contenido() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            _IconoCirculo(icono: icono, color: color, tam: 36),
+            const Spacer(),
+            if (onTap != null) Icon(Icons.chevron_right_rounded, color: color),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Text('$valor', style: estiloTitulo(22)),
+        const SizedBox(height: 2),
+        Text(
+          texto,
+          maxLines: 2,
+          style: const TextStyle(
+            fontSize: 12,
+            height: 1.25,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 }

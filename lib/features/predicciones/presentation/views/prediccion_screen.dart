@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/boton_inicio.dart';
+import '../../../admin/data/models/estadisticas.dart';
 import '../../../admin/presentation/widgets/graficas.dart';
 import '../../../clima/presentation/widgets/consejo_clima.dart';
 import '../../../recibos/data/models/recibo.dart';
@@ -12,22 +13,31 @@ import '../../../recibos/presentation/utils/formatos.dart';
 import '../../../recibos/presentation/widgets/consumo_chart.dart';
 import '../../data/models/prediccion.dart';
 import '../../data/services/prediccion_service.dart';
+import 'historial_predicciones_screen.dart';
 
-/// Pide la predicción a FastAPI, muestra el avance del cálculo y luego el
-/// resultado.
+/// Pide la predicción a FastAPI, la guarda en el historial (Spring) y muestra
+/// el resultado. Con [PrediccionScreen.guardada] solo muestra una del historial.
 class PrediccionScreen extends StatefulWidget {
-  final Empresa empresa;
-  final String usuarioId;
+  final Empresa? empresa;
+  final String? usuarioId;
+
+  /// Predicción del historial; si llega, no se calcula de nuevo.
+  final Prediccion? guardada;
 
   /// Permite usar datos de prueba en los tests.
   final PrediccionService? servicio;
 
   const PrediccionScreen({
     super.key,
-    required this.empresa,
-    required this.usuarioId,
+    required Empresa this.empresa,
+    required String this.usuarioId,
     this.servicio,
-  });
+  }) : guardada = null;
+
+  const PrediccionScreen.guardada(Prediccion this.guardada, {super.key})
+      : empresa = null,
+        usuarioId = null,
+        servicio = null;
 
   @override
   State<PrediccionScreen> createState() => _PrediccionScreenState();
@@ -35,13 +45,13 @@ class PrediccionScreen extends StatefulWidget {
 
 class _PrediccionScreenState extends State<PrediccionScreen> {
   late final PrediccionService _service = widget.servicio ?? PrediccionService();
-  Prediccion? _prediccion;
+  late Prediccion? _prediccion = widget.guardada;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _calcular();
+    if (widget.guardada == null) _calcular();
   }
 
   Future<void> _calcular() async {
@@ -52,15 +62,37 @@ class _PrediccionScreenState extends State<PrediccionScreen> {
     // Un mínimo de espera para que el avance se alcance a leer
     final espera = Future<void>.delayed(const Duration(milliseconds: 1800));
     try {
-      final prediccion = await _service.predecir(
-        empresa: widget.empresa,
-        usuarioId: widget.usuarioId,
+      var prediccion = await _service.predecir(
+        empresa: widget.empresa!,
+        usuarioId: widget.usuarioId!,
       );
+      // Guardarla no debe impedir ver el resultado
+      String? aviso;
+      try {
+        prediccion = await _service.guardar(prediccion);
+      } on PrediccionException {
+        aviso = 'No pudimos guardar esta predicción en tu historial.';
+      }
       await espera;
-      if (mounted) setState(() => _prediccion = prediccion);
+      if (!mounted) return;
+      setState(() => _prediccion = prediccion);
+      if (aviso != null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(aviso)));
+      }
     } on PrediccionException catch (e) {
       if (mounted) setState(() => _error = e.mensaje);
     }
+  }
+
+  void _verHistorial() {
+    final navegador = Navigator.of(context);
+    if (widget.guardada != null) {
+      navegador.pop();
+      return;
+    }
+    navegador.pushReplacement(
+      MaterialPageRoute(builder: (_) => const HistorialPrediccionesScreen()),
+    );
   }
 
   @override
@@ -74,7 +106,11 @@ class _PrediccionScreenState extends State<PrediccionScreen> {
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 400),
         child: prediccion != null
-            ? _Resultado(prediccion: prediccion)
+            ? _Resultado(
+                prediccion: prediccion,
+                delHistorial: widget.guardada != null,
+                onVerHistorial: _verHistorial,
+              )
             : _error != null
             ? _Error(mensaje: _error!, onReintentar: _calcular)
             : const _Calculando(),
@@ -261,7 +297,15 @@ class _Error extends StatelessWidget {
 class _Resultado extends StatelessWidget {
   final Prediccion prediccion;
 
-  const _Resultado({required this.prediccion});
+  /// Abierta desde el historial: no se ofrece calcular otra.
+  final bool delHistorial;
+  final VoidCallback onVerHistorial;
+
+  const _Resultado({
+    required this.prediccion,
+    required this.delHistorial,
+    required this.onVerHistorial,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -278,6 +322,10 @@ class _Resultado extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
       children: [
         _Encabezado(prediccion: p),
+        if (p.consumoReal != null) ...[
+          const SizedBox(height: 14),
+          _ResultadoReal(prediccion: p),
+        ],
         const SizedBox(height: 14),
         Row(
           children: [
@@ -337,25 +385,31 @@ class _Resultado extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        TarjetaPanel(
-          titulo: 'Resumen',
-          icono: Icons.insights_rounded,
-          color: AppColors.primary,
-          child: Column(
-            children: [
-              _Fila('Promedio de tus últimos meses', _cantidad(promedio, p.unidad)),
-              if (mayor != null)
-                _Fila('Mes de mayor consumo',
-                    '${formatearPeriodoLargo(mayor.periodo)} · ${_cantidad(mayor.consumo, p.unidad)}'),
-              if (menor != null)
-                _Fila('Mes de menor consumo',
-                    '${formatearPeriodoLargo(menor.periodo)} · ${_cantidad(menor.consumo, p.unidad)}'),
-              if (cambioPromedio != null)
-                _Fila('$mes frente a tu promedio', porcentaje(cambioPromedio)),
-            ],
+        if (p.consumoEsperado != null) ...[
+          const SizedBox(height: 14),
+          _FrenteAlEstrato(prediccion: p),
+        ],
+        if (p.historico.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          TarjetaPanel(
+            titulo: 'Resumen',
+            icono: Icons.insights_rounded,
+            color: AppColors.primary,
+            child: Column(
+              children: [
+                _Fila('Promedio de tus últimos meses', _cantidad(promedio, p.unidad)),
+                if (mayor != null)
+                  _Fila('Mes de mayor consumo',
+                      '${formatearPeriodoLargo(mayor.periodo)} · ${_cantidad(mayor.consumo, p.unidad)}'),
+                if (menor != null)
+                  _Fila('Mes de menor consumo',
+                      '${formatearPeriodoLargo(menor.periodo)} · ${_cantidad(menor.consumo, p.unidad)}'),
+                if (cambioPromedio != null)
+                  _Fila('$mes frente a tu promedio', porcentaje(cambioPromedio)),
+              ],
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: 14),
         TarjetaPanel(
           titulo: 'Consejos para $mes',
@@ -377,10 +431,10 @@ class _Resultado extends StatelessWidget {
           color: ColoresPanel.violeta,
           child: Column(
             children: [
-              _Fila('Modelo', p.algoritmo),
-              _Fila('Versión', p.versionModelo),
-              const _Fila('Servicio de cálculo', 'FastAPI'),
-              _Fila('Meses de historial usados', '${p.mesesUsados}'),
+              _Fila('Modelo', p.algoritmo ?? 'Modelo de la web'),
+              if (p.versionModelo != null) _Fila('Versión', p.versionModelo!),
+              _Fila('Servicio de cálculo', p.origen == 'WEB' ? 'ServiApp web' : 'FastAPI'),
+              if (p.mesesUsados > 0) _Fila('Meses de historial usados', '${p.mesesUsados}'),
               _Fila('Calculado el', formatearFecha(p.calculadaEl)),
             ],
           ),
@@ -394,11 +448,19 @@ class _Resultado extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         OutlinedButton.icon(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: delHistorial ? onVerHistorial : () => Navigator.of(context).pop(),
           style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 54)),
-          icon: const Icon(Icons.trending_up_rounded),
-          label: const Text('Calcular otra predicción'),
+          icon: Icon(delHistorial ? Icons.history_rounded : Icons.trending_up_rounded),
+          label: Text(delHistorial ? 'Volver al historial' : 'Calcular otra predicción'),
         ),
+        if (!delHistorial) ...[
+          const SizedBox(height: 4),
+          TextButton.icon(
+            onPressed: onVerHistorial,
+            icon: const Icon(Icons.history_rounded),
+            label: const Text('Ver mis predicciones'),
+          ),
+        ],
         const SizedBox(height: 12),
         ElevatedButton.icon(
           onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
@@ -502,15 +564,28 @@ class _Encabezado extends StatelessWidget {
               estilo: estiloTitulo(38, color: Colors.white),
             ),
           ),
-          if (cambio != null && ultimo != null) ...[
+          if (p.nivelConsumo != null || (cambio != null && ultimo != null)) ...[
             const SizedBox(height: 10),
-            _Pastilla(
-              icono: cambio.abs() < 0.03
-                  ? Icons.trending_flat_rounded
-                  : cambio > 0
-                  ? Icons.trending_up_rounded
-                  : Icons.trending_down_rounded,
-              texto: '${porcentaje(cambio)} frente a ${formatearPeriodoLargo(ultimo.periodo)}',
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (p.nivelConsumo != null)
+                  _Pastilla(
+                    icono: Icons.circle,
+                    colorIcono: ColoresPanel.de(p.nivelConsumo!, 0),
+                    texto: 'Consumo ${p.nivelConsumo}',
+                  ),
+                if (cambio != null && ultimo != null)
+                  _Pastilla(
+                    icono: cambio.abs() < 0.03
+                        ? Icons.trending_flat_rounded
+                        : cambio > 0
+                        ? Icons.trending_up_rounded
+                        : Icons.trending_down_rounded,
+                    texto: '${porcentaje(cambio)} frente a ${formatearPeriodoLargo(ultimo.periodo)}',
+                  ),
+              ],
             ),
           ],
         ],
@@ -522,8 +597,9 @@ class _Encabezado extends StatelessWidget {
 class _Pastilla extends StatelessWidget {
   final IconData icono;
   final String texto;
+  final Color colorIcono;
 
-  const _Pastilla({required this.icono, required this.texto});
+  const _Pastilla({required this.icono, required this.texto, this.colorIcono = Colors.white});
 
   @override
   Widget build(BuildContext context) {
@@ -537,7 +613,7 @@ class _Pastilla extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icono, size: 14, color: Colors.white),
+          Icon(icono, size: 14, color: colorIcono),
           const SizedBox(width: 5),
           Flexible(
             child: Text(
@@ -676,6 +752,100 @@ class _Fila extends StatelessWidget {
                 color: AppColors.textPrimary,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Predicción frente a lo que de verdad se consumió ese mes.
+class _ResultadoReal extends StatelessWidget {
+  final Prediccion prediccion;
+
+  const _ResultadoReal({required this.prediccion});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = prediccion;
+    final real = p.consumoReal!;
+    final acierto = p.acierto;
+    final diferencia = real > 0 ? (real - p.consumoEstimado) / p.consumoEstimado : null;
+
+    return TarjetaPanel(
+      titulo: 'Así te fue en ${formatearPeriodoLargo(p.periodoEstimado)}',
+      subtitulo: 'Ya llegó tu recibo de ese mes',
+      icono: Icons.fact_check_rounded,
+      color: AppColors.green,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: _Cifra(titulo: 'Predicción', valor: p.consumoEstimado, unidad: p.unidad)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _Cifra(
+                  titulo: 'Consumo real',
+                  valor: real,
+                  unidad: p.unidad,
+                  color: p.empresa.color,
+                  cambio: diferencia,
+                ),
+              ),
+            ],
+          ),
+          if (acierto != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              'La predicción acertó en un ${(acierto * 100).round()} %. '
+              '${diferencia == null || diferencia.abs() < 0.03 ? 'Consumiste casi lo previsto.' : diferencia > 0 ? 'Consumiste más de lo previsto.' : 'Consumiste menos de lo previsto.'}',
+              style: const TextStyle(fontSize: 13.5, height: 1.45, color: AppColors.textPrimary),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// La predicción frente a un hogar del mismo estrato y habitantes (las
+/// mismas reglas del análisis de consumo, calculadas en Spring).
+class _FrenteAlEstrato extends StatelessWidget {
+  final Prediccion prediccion;
+
+  const _FrenteAlEstrato({required this.prediccion});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = prediccion;
+    final personas = p.habitantes == null
+        ? ''
+        : ' · ${p.habitantes} ${p.habitantes == 1 ? 'persona' : 'personas'}';
+    final mensaje = switch (p.nivelConsumo) {
+      'Bajo' => 'Consumirías menos que un hogar como el tuyo. ¡Muy bien!',
+      'Elevado' => 'Consumirías más que un hogar como el tuyo: revisa los consejos.',
+      _ => 'Estarías dentro de lo normal para un hogar como el tuyo.',
+    };
+
+    return TarjetaPanel(
+      titulo: p.estrato == null ? 'Frente a hogares como el tuyo' : 'Predicción vs. estrato ${p.estrato}',
+      icono: Icons.groups_rounded,
+      color: ColoresPanel.teal,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          BarrasHorizontales(
+            items: [
+              ItemConteo('Tu predicción', p.consumoEstimado),
+              ItemConteo('Hogar promedio$personas', p.consumoEsperado!),
+            ],
+            formatoValor: (i) => '${formatearNumero(i.valor.roundToDouble())} ${p.unidad}',
+          ),
+          const SizedBox(height: 12),
+          Text(
+            mensaje,
+            style: const TextStyle(fontSize: 13.5, height: 1.45, color: AppColors.textSecondary),
           ),
         ],
       ),

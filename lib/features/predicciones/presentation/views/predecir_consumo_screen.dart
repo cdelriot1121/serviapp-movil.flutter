@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/boton_inicio.dart';
+import '../../../admin/presentation/widgets/graficas.dart';
 import '../../../analisis/presentation/views/analisis_consumo_screen.dart';
 import '../../../perfil/data/perfil_service.dart';
 import '../../../recibos/data/models/recibo.dart';
@@ -10,6 +11,7 @@ import '../../../recibos/data/services/recibo_service.dart';
 import '../../../recibos/presentation/escanear_recibo.dart';
 import '../../../recibos/presentation/utils/formatos.dart';
 import '../../data/models/prediccion.dart';
+import 'historial_predicciones_screen.dart';
 import 'prediccion_screen.dart';
 
 /// Elige el servicio y revisa que haya meses suficientes antes de pedir la
@@ -101,8 +103,8 @@ class _PredecirConsumoScreenState extends State<PredecirConsumoScreen> {
     }
   }
 
-  void _calcular(HistorialServicio historial) {
-    Navigator.of(context).push(
+  Future<void> _calcular(HistorialServicio historial) async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => PrediccionScreen(
           empresa: historial.empresa,
@@ -110,6 +112,15 @@ class _PredecirConsumoScreenState extends State<PredecirConsumoScreen> {
         ),
       ),
     );
+    // Actualiza cuántas predicciones hay guardadas
+    if (mounted) _cargar();
+  }
+
+  Future<void> _verHistorial() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const HistorialPrediccionesScreen()),
+    );
+    if (mounted) _cargar();
   }
 
   @override
@@ -117,7 +128,14 @@ class _PredecirConsumoScreenState extends State<PredecirConsumoScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Predecir consumo'),
-        actions: const [BotonInicio()],
+        actions: [
+          IconButton(
+            tooltip: 'Mis predicciones',
+            onPressed: _verHistorial,
+            icon: const Icon(Icons.history_rounded),
+          ),
+          const BotonInicio(),
+        ],
       ),
       body: _buildCuerpo(),
     );
@@ -163,6 +181,8 @@ class _PredecirConsumoScreenState extends State<PredecirConsumoScreen> {
             'historial de tus recibos.',
             style: TextStyle(fontSize: 14, height: 1.5, color: AppColors.textSecondary),
           ),
+          const SizedBox(height: 14),
+          _AccesoHistorial(total: _perfil?.actividad.predicciones, onTap: _verHistorial),
           const SizedBox(height: 20),
           Text('Tipo de servicio', style: estiloTitulo(16)),
           const SizedBox(height: 10),
@@ -449,6 +469,74 @@ class _BotonCalcular extends StatelessWidget {
         ),
         icon: const Icon(Icons.trending_up_rounded),
         label: const Text('Calcular predicción'),
+      ),
+    );
+  }
+}
+
+/// Lleva al historial de predicciones guardadas.
+class _AccesoHistorial extends StatelessWidget {
+  /// null mientras no se sabe (sin perfil).
+  final int? total;
+  final VoidCallback onTap;
+
+  const _AccesoHistorial({required this.total, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final total = this.total;
+    final detalle = total == null || total == 0
+        ? 'Compara lo que predijimos con tu consumo real'
+        : '${total == 1 ? '1 predicción guardada' : '$total predicciones guardadas'} · '
+            'compáralas con tu consumo real';
+
+    return Material(
+      color: ColoresPanel.violeta.withValues(alpha: 0.08),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: ColoresPanel.violeta.withValues(alpha: 0.25)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: ColoresPanel.violeta.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.history_rounded, color: ColoresPanel.violeta),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Mis predicciones',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      detalle,
+                      style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: ColoresPanel.violeta),
+            ],
+          ),
+        ),
       ),
     );
   }

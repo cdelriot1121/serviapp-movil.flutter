@@ -18,7 +18,7 @@ android {
 
     defaultConfig {
         // Identificador de la app en Google Play y Firebase (no se puede cambiar después de publicar)
-        applicationId = "com.serviapp.app"
+        applicationId = "com.gvwc.serviapp"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

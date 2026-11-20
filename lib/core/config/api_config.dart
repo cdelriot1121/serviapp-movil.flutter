@@ -72,4 +72,5 @@ class ApiConfig {
   static const String adminEstadisticasEndpoint =
       '/api/mobile/admin/estadisticas';
   static const String adminFallasEndpoint = '/api/mobile/admin/fallas';
+  static const String adminCortesEndpoint = '/api/mobile/admin/cortes';
 }

@@ -33,11 +33,28 @@ class Estadisticas {
   final List<ItemConteo> prediccionesPorNivel;
   final double? confianzaPromedio;
 
-  // Reportes de fallas y cortes
+  // Reportes de fallas
   final List<ItemConteo> fallasPorEstado;
   final List<ItemConteo> fallasPorServicio;
+  final List<ItemConteo> fallasTopBarrios;
+  final double porcentajeFallasSolucionadas;
+
+  /// Horas promedio entre el reporte y la solución; null sin fallas solucionadas.
+  final double? horasPromedioSolucion;
+
+  /// Vecinos que marcaron "A mí también" en total.
+  final int confirmacionesFallas;
+
+  /// Pendientes hace más de un día: las que piden atención.
+  final int fallasDemoradas;
+
+  // Cortes programados
   final int cortesTotal;
   final int cortesActivos;
+  final int cortesProximaSemana;
+  final int barriosConCorteAhora;
+  final List<ItemConteo> cortesPorServicio;
+  final List<ItemConteo> cortesTopBarrios;
 
   const Estadisticas({
     required this.generadoEn,
@@ -63,8 +80,17 @@ class Estadisticas {
     required this.confianzaPromedio,
     required this.fallasPorEstado,
     required this.fallasPorServicio,
+    required this.fallasTopBarrios,
+    required this.porcentajeFallasSolucionadas,
+    required this.horasPromedioSolucion,
+    required this.confirmacionesFallas,
+    required this.fallasDemoradas,
     required this.cortesTotal,
     required this.cortesActivos,
+    required this.cortesProximaSemana,
+    required this.barriosConCorteAhora,
+    required this.cortesPorServicio,
+    required this.cortesTopBarrios,
   });
 
   factory Estadisticas.fromJson(Map<String, dynamic> json) {
@@ -111,8 +137,19 @@ class Estadisticas {
           ?.toDouble(),
       fallasPorEstado: ItemConteo.lista(fallas['porEstado']),
       fallasPorServicio: ItemConteo.lista(fallas['porServicio']),
+      fallasTopBarrios: ItemConteo.lista(fallas['topBarrios']),
+      porcentajeFallasSolucionadas:
+          (fallas['porcentajeSolucionadas'] as num?)?.toDouble() ?? 0,
+      horasPromedioSolucion: (fallas['horasPromedioSolucion'] as num?)
+          ?.toDouble(),
+      confirmacionesFallas: _entero(fallas['confirmaciones']),
+      fallasDemoradas: _entero(fallas['pendientesDemoradas']),
       cortesTotal: _entero(cortes['total']),
       cortesActivos: _entero(cortes['activos']),
+      cortesProximaSemana: _entero(cortes['proximaSemana']),
+      barriosConCorteAhora: _entero(cortes['barriosAfectadosAhora']),
+      cortesPorServicio: ItemConteo.lista(cortes['porServicio']),
+      cortesTopBarrios: ItemConteo.lista(cortes['topBarrios']),
     );
   }
 }
@@ -189,6 +226,9 @@ class ActividadMes {
   final int recibos;
   final int analisis;
   final int predicciones;
+  final int fallas;
+  final int fallasSolucionadas;
+  final int cortes;
 
   const ActividadMes({
     required this.periodo,
@@ -196,6 +236,9 @@ class ActividadMes {
     required this.recibos,
     required this.analisis,
     required this.predicciones,
+    this.fallas = 0,
+    this.fallasSolucionadas = 0,
+    this.cortes = 0,
   });
 
   factory ActividadMes.fromJson(Map<String, dynamic> json) => ActividadMes(
@@ -204,6 +247,9 @@ class ActividadMes {
     recibos: _entero(json['recibos']),
     analisis: _entero(json['analisis']),
     predicciones: _entero(json['predicciones']),
+    fallas: _entero(json['fallas']),
+    fallasSolucionadas: _entero(json['fallasSolucionadas']),
+    cortes: _entero(json['cortes']),
   );
 }
 

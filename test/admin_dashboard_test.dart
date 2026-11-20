@@ -51,6 +51,9 @@ Map<String, dynamic> _respuesta({int usuarios = 42}) => {
         'recibos': m * 3,
         'analisis': m * 2,
         'predicciones': m + 1,
+        'fallas': m - 3,
+        'fallasSolucionadas': m - 5,
+        'cortes': m % 3,
       },
   ],
   'recibos': {
@@ -107,8 +110,28 @@ Map<String, dynamic> _respuesta({int usuarios = 42}) => {
       {'etiqueta': 'Energía', 'valor': 6},
       {'etiqueta': 'Agua', 'valor': 3},
     ],
+    'topBarrios': [
+      {'etiqueta': 'MANGA', 'valor': 4},
+      {'etiqueta': 'SAN DIEGO', 'valor': 2},
+    ],
+    'porcentajeSolucionadas': 22.22,
+    'horasPromedioSolucion': 5.5,
+    'confirmaciones': 11,
+    'pendientesDemoradas': 2,
   },
-  'cortes': {'total': 7, 'activos': 1},
+  'cortes': {
+    'total': 7,
+    'activos': 1,
+    'proximaSemana': 1,
+    'barriosAfectadosAhora': 3,
+    'porServicio': [
+      {'etiqueta': 'Agua', 'valor': 4},
+      {'etiqueta': 'Energía', 'valor': 3},
+    ],
+    'topBarrios': [
+      {'etiqueta': 'CENTRO', 'valor': 3},
+    ],
+  },
 };
 
 class _ServicioFalso extends AdminService {
@@ -133,7 +156,12 @@ Future<void> _abrir(WidgetTester tester, AdminService servicio) async {
   await tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.lightTheme,
-      home: AdminDashboardScreen(nombre: 'Laura Admin', servicio: servicio),
+      // Sin avisos push: usan Firebase y las notificaciones del celular
+      home: AdminDashboardScreen(
+        nombre: 'Laura Admin',
+        servicio: servicio,
+        avisos: false,
+      ),
     ),
   );
   await tester.pump(const Duration(milliseconds: 50));
@@ -152,6 +180,13 @@ void main() {
     expect(e.consumoPromedioPorServicio.first.unidad, 'kWh');
     expect(e.confianzaPromedio, 0.87);
     expect(e.cortesActivos, 1);
+    expect(e.fallasTopBarrios.first.etiqueta, 'MANGA');
+    expect(e.horasPromedioSolucion, 5.5);
+    expect(e.fallasDemoradas, 2);
+    expect(e.cortesProximaSemana, 1);
+    expect(e.cortesPorServicio, hasLength(2));
+    expect(e.actividadMensual.last.fallas, 8);
+    expect(e.actividadMensual.last.cortes, 2);
   });
 
   test('tolera una respuesta vacía', () {
@@ -159,6 +194,8 @@ void main() {
     expect(e.resumen.usuarios, 0);
     expect(e.actividadMensual, isEmpty);
     expect(e.confianzaPromedio, isNull);
+    expect(e.horasPromedioSolucion, isNull);
+    expect(e.cortesTopBarrios, isEmpty);
   });
 
   testWidgets('muestra el panel completo sin desbordes', (tester) async {
@@ -168,6 +205,9 @@ void main() {
     expect(find.text('Usuarios registrados'), findsOneWidget);
     expect(find.text('42'), findsWidgets);
     expect(find.textContaining('En vivo'), findsOneWidget);
+    // Accesos a la gestión con las fallas por revisar
+    expect(find.text('Fallas · 4 por revisar'), findsOneWidget);
+    expect(find.text('Cortes'), findsOneWidget);
 
     // Recorre todo el panel para construir cada sección
     final lista = find.byType(Scrollable).first;
@@ -178,7 +218,17 @@ void main() {
       'Predicciones por servicio',
       'Valor total facturado',
       'Consumo promedio por recibo',
+      'Revisar fallas',
+      '2 fallas llevan más de un día sin revisar.',
+      'Atención de fallas',
+      '5,5 h',
+      'Fallas y cortes por mes',
+      'Barrios con más fallas',
+      'San Diego',
       'Cortes programados',
+      'En los próximos 7 días',
+      'Cortes por servicio',
+      'Barrios con más cortes',
     ]) {
       await tester.scrollUntilVisible(find.text(texto), 300, scrollable: lista);
       await tester.pump(const Duration(seconds: 1));

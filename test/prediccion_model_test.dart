@@ -21,6 +21,7 @@ const _json = <String, dynamic>{
     {'periodo': '2026-09', 'consumo': 188.0},
     {'periodo': '2026-10', 'consumo': 180.0},
   ],
+  'porcentajeFiabilidad': 90.89,
   'metadatosModelo': {'versionModelo': 'ServiApp_LSTM_oficial', 'algoritmo': 'LSTM Red Neuronal Recurrente'},
 };
 
@@ -121,6 +122,7 @@ class _ServicioFalso extends PrediccionService {
       ..._guardada,
       'consumoReal': null,
       'historico': prediccion.toJson()['historico'],
+      'porcentajeFiabilidad': prediccion.porcentajeFiabilidad,
     });
   }
 
@@ -207,6 +209,7 @@ void main() {
       expect(p.historico, hasLength(5));
       expect(p.mesesUsados, 5);
       expect(p.versionModelo, 'ServiApp_LSTM_oficial');
+      expect(p.porcentajeFiabilidad, 90.89);
       expect(p.ultimoMes!.periodo, '2026-10');
       expect(p.promedio, closeTo(193.8, 0.001));
       expect(p.mesMayor!.periodo, '2026-08');
@@ -214,6 +217,12 @@ void main() {
       expect(p.cambioFrente(180), closeTo(0.1, 0.0001));
       expect(p.cambioFrente(null), isNull);
       expect(p.acierto, isNull);
+    });
+
+    test('sin confiabilidad o con un valor inválido queda en null', () {
+      expect(Prediccion.fromJson({..._json}..remove('porcentajeFiabilidad')).porcentajeFiabilidad, isNull);
+      expect(Prediccion.fromJson({..._json, 'porcentajeFiabilidad': 140}).porcentajeFiabilidad, isNull);
+      expect(Prediccion.desdeSpring(_guardada).porcentajeFiabilidad, isNull);
     });
 
     test('rechaza una respuesta sin consumo estimado', () {
@@ -230,6 +239,7 @@ void main() {
       expect(cuerpo['periodoEstimado'], '2026-11');
       expect(cuerpo['consumoEstimado'], 198.0);
       expect(cuerpo['versionModelo'], 'ServiApp_LSTM_oficial');
+      expect(cuerpo['porcentajeFiabilidad'], 90.89);
       expect(cuerpo['historico'], hasLength(5));
       expect((cuerpo['historico'] as List).first, {'periodo': '2026-06', 'consumo': 191.0});
     });
@@ -244,6 +254,7 @@ void main() {
       expect(p.habitantes, 2);
       expect(p.mesesUsados, 2);
       expect(p.calculadaEl, DateTime(2026, 10, 28, 9, 15));
+      expect(Prediccion.desdeSpring({..._guardada, 'porcentajeFiabilidad': 95.38}).porcentajeFiabilidad, 95.38);
       // 198 predichos frente a 220 reales: 90 % de acierto
       expect(p.acierto, closeTo(0.9, 0.0001));
     });
@@ -275,6 +286,7 @@ void main() {
       expect(find.text('+10 % frente a Octubre 2026'), findsOneWidget);
       // Categoría que agrega Spring al guardarla
       expect(find.text('Consumo Moderado'), findsOneWidget);
+      expect(find.text('Confiabilidad 90,9 %'), findsOneWidget);
 
       await _recorrer(tester, [
         find.text('Tendencia y predicción (kWh)'),
@@ -283,6 +295,7 @@ void main() {
         find.text('Resumen'),
         find.text('Consejos para Noviembre 2026'),
         find.text('ServiApp_LSTM_oficial'),
+        find.text('Confiabilidad del modelo'),
         find.text('Ver mis predicciones'),
         find.text('Volver al inicio'),
       ]);
@@ -297,6 +310,7 @@ void main() {
       expect(find.text('Tu predicción'), findsOneWidget);
       expect(find.text('No pudimos guardar esta predicción en tu historial.'), findsOneWidget);
       expect(find.text('Consumo Moderado'), findsNothing);
+      expect(find.text('Confiabilidad 90,9 %'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
     });
 
@@ -328,6 +342,7 @@ void main() {
 
       await _recorrer(tester, [find.text('Modelo de la web'), find.text('ServiApp web')]);
       expect(find.text('Resumen'), findsNothing);
+      expect(find.textContaining('Confiabilidad'), findsNothing);
       await tester.pumpWidget(const SizedBox());
     });
   });

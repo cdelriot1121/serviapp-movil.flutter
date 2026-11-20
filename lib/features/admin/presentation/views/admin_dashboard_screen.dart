@@ -8,23 +8,37 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../../auth/presentation/views/login_screen.dart';
 import '../../../auth/presentation/widgets/escena_naturaleza.dart';
+import '../../../fallas/data/models/falla.dart';
+import '../../../notificaciones/data/aviso.dart';
+import '../../../notificaciones/notificaciones_service.dart';
 import '../../../recibos/data/models/recibo.dart';
 import '../../../recibos/presentation/utils/formatos.dart';
 import '../../../recordatorios/recordatorios_service.dart';
 import '../../data/models/estadisticas.dart';
 import '../../data/services/admin_service.dart';
 import '../widgets/graficas.dart';
+import 'admin_cortes_screen.dart';
 import 'admin_fallas_screen.dart';
 
-/// Panel de los administradores: solo estadísticas de ServiApp, sin datos
-/// personales. Se actualiza solo cada [intervalo] mientras está en pantalla.
+/// Panel de los administradores: estadísticas de ServiApp (sin datos
+/// personales) y acceso a la gestión de fallas y cortes. Se actualiza solo
+/// cada [intervalo] mientras está en pantalla, y recibe un aviso push cada
+/// vez que un usuario reporta una falla.
 class AdminDashboardScreen extends StatefulWidget {
   final String nombre;
 
   /// Permite usar datos de prueba en los tests.
   final AdminService? servicio;
 
-  const AdminDashboardScreen({super.key, required this.nombre, this.servicio});
+  /// Avisos push de fallas nuevas. Se apagan en las pruebas (usan Firebase).
+  final bool avisos;
+
+  const AdminDashboardScreen({
+    super.key,
+    required this.nombre,
+    this.servicio,
+    this.avisos = true,
+  });
 
   /// Cada cuánto se vuelven a pedir las estadísticas a Spring Boot.
   static const Duration intervalo = Duration(seconds: 10);
@@ -69,8 +83,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     _cargar();
     _iniciarTemporizador();
 
+    if (widget.avisos) {
+      NotificacionesService.iniciar();
+      NotificacionesService.toque.addListener(_abrirAviso);
+      // Llegó un aviso (una falla nueva): las cifras cambian
+      NotificacionesService.cambios.addListener(_cargar);
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => _visible = true);
+      if (!mounted) return;
+      setState(() => _visible = true);
+      // Por si la app se abrió tocando el aviso de una falla
+      if (widget.avisos) _abrirAviso();
     });
   }
 
@@ -78,7 +102,39 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   void dispose() {
     _temporizador?.cancel();
     WidgetsBinding.instance.removeObserver(this);
+    if (widget.avisos) {
+      NotificacionesService.toque.removeListener(_abrirAviso);
+      NotificacionesService.cambios.removeListener(_cargar);
+      NotificacionesService.detener();
+    }
     super.dispose();
+  }
+
+  // Al tocar el aviso de una falla nueva se abren las fallas por revisar
+  void _abrirAviso() {
+    final toque = NotificacionesService.toque.value;
+    if (toque == null || !mounted) return;
+    NotificacionesService.toque.value = null;
+    if (toque.avisoId.isNotEmpty) {
+      AvisosApi().marcarLeida(toque.avisoId).catchError((_) => 0);
+    }
+    final navegador = Navigator.of(context);
+    navegador.popUntil((r) => r.isFirst);
+    _abrirFallas();
+  }
+
+  Future<void> _abrirFallas() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => AdminFallasScreen(servicio: widget.servicio)),
+    );
+    _cargar();
+  }
+
+  Future<void> _abrirCortes() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => AdminCortesScreen(servicio: widget.servicio)),
+    );
+    _cargar();
   }
 
   // Sin la app en pantalla no se consulta el servidor; al volver se refresca.
@@ -159,6 +215,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     if (confirmar != true || !mounted) return;
 
     _temporizador?.cancel();
+    // Antes del logout: quitar el celular de los avisos necesita la sesión
+    if (widget.avisos) await NotificacionesService.alCerrarSesion();
     await RecordatoriosService.alCerrarSesion();
     await AuthService().logout();
     if (mounted) _irAlLogin();
@@ -310,19 +368,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 sinConexion: _sinConexion,
               ),
               const SizedBox(height: 14),
-              // Fallas que reportan los usuarios (cambiar su estado les avisa)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: _PildoraBlanca(
-                  icono: Icons.report_problem_rounded,
-                  texto: 'Fallas reportadas',
-                  tooltip: 'Gestionar las fallas que reportan los usuarios',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const AdminFallasScreen(),
-                    ),
+              // Gestión: fallas que reportan los usuarios y cortes programados
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _PildoraBlanca(
+                    icono: Icons.report_problem_rounded,
+                    texto: _pendientes == 0
+                        ? 'Fallas'
+                        : 'Fallas · $_pendientes por revisar',
+                    tooltip: 'Revisar las fallas que reportan los usuarios',
+                    onTap: _abrirFallas,
                   ),
-                ),
+                  _PildoraBlanca(
+                    icono: Icons.event_busy_rounded,
+                    texto: 'Cortes',
+                    tooltip: 'Programar cortes y avisar a los barrios',
+                    onTap: _abrirCortes,
+                  ),
+                ],
               ),
             ],
           ),
@@ -485,12 +550,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
   // ---------------------------------------------------------- Resumen
 
+  /// Fallas en estado Pendiente.
+  int get _pendientes => _datos == null ? 0 : _contar(_datos!.fallasPorEstado, 'Pendiente');
+
+  static int _contar(List<ItemConteo> items, String etiqueta) => items
+      .where((i) => i.etiqueta == etiqueta)
+      .fold<double>(0, (s, i) => s + i.valor)
+      .toInt();
+
   List<Widget> _seccionResumen(Estadisticas d) {
     final r = d.resumen;
-    final pendientesFallas = d.fallasPorEstado
-        .where((i) => i.etiqueta == 'Pendiente')
-        .fold<double>(0, (s, i) => s + i.valor)
-        .toInt();
+    final pendientesFallas = _contar(d.fallasPorEstado, 'Pendiente');
 
     return [
       _titulo(_Seccion.resumen, 'Las cifras más importantes de la plataforma.'),
@@ -828,48 +898,242 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         _Seccion.reportes,
         'Fallas reportadas por los usuarios y cortes programados.',
       ),
+      // Accesos directos a la gestión
+      Row(
+        children: [
+          Expanded(
+            child: _Accion(
+              icono: Icons.fact_check_rounded,
+              titulo: 'Revisar fallas',
+              detalle: _pendientes == 0
+                  ? 'Todo al día'
+                  : '$_pendientes por revisar',
+              color: AppColors.red,
+              alerta: _pendientes > 0,
+              onTap: _abrirFallas,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _Accion(
+              icono: Icons.add_alert_rounded,
+              titulo: 'Programar corte',
+              detalle: d.cortesActivos == 0
+                  ? 'Ninguno vigente'
+                  : '${d.cortesActivos} vigentes',
+              color: AppColors.orange,
+              onTap: _abrirCortes,
+            ),
+          ),
+        ],
+      ),
+      if (d.fallasDemoradas > 0) ...[
+        const SizedBox(height: 12),
+        _AvisoPanel(
+          texto: d.fallasDemoradas == 1
+              ? '1 falla lleva más de un día sin revisar.'
+              : '${d.fallasDemoradas} fallas llevan más de un día sin revisar.',
+          onTap: _abrirFallas,
+        ),
+      ],
+      _espacio,
+      TarjetaPanel(
+        titulo: 'Atención de fallas',
+        subtitulo: 'Qué tan rápido se resuelven los reportes',
+        icono: Icons.timer_outlined,
+        color: AppColors.green,
+        child: Column(
+          children: [
+            Row(
+              children: [
+                AnilloPorcentaje(
+                  porcentaje: d.porcentajeFallasSolucionadas,
+                  color: AppColors.green,
+                  etiqueta: 'Solucionadas',
+                  tamano: 86,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        d.horasPromedioSolucion == null
+                            ? '—'
+                            : _duracion(d.horasPromedioSolucion!),
+                        style: estiloTitulo(24, color: AppColors.green),
+                      ),
+                      const Text(
+                        'tiempo promedio desde el reporte hasta la solución',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.4,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Divider(height: 1, color: AppColors.border),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: _MiniCifra(
+                    valor: _pendientes,
+                    etiqueta: 'Pendientes',
+                    color: AppColors.orange,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _MiniCifra(
+                    valor: d.confirmacionesFallas,
+                    etiqueta: 'Vecinos que confirmaron',
+                    color: ColoresPanel.teal,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      _espacio,
+      TarjetaPanel(
+        titulo: 'Fallas y cortes por mes',
+        subtitulo: 'Toca una serie para ocultarla o mostrarla',
+        icono: Icons.stacked_line_chart_rounded,
+        color: AppColors.red,
+        child: ActividadChart(
+          meses: d.actividadMensual,
+          series: ActividadChart.seriesReportes,
+        ),
+      ),
+      _espacio,
       TarjetaPanel(
         titulo: 'Fallas por estado',
         icono: Icons.report_gmailerrorred_rounded,
         color: AppColors.red,
-        child: BarrasHorizontales(items: d.fallasPorEstado),
+        child: DonaChart(
+          items: [
+            for (final i in d.fallasPorEstado)
+              ItemConteo(_estadoFalla(i.etiqueta), i.valor),
+          ],
+          etiquetaCentro: 'reportes',
+        ),
       ),
       _espacio,
       TarjetaPanel(
         titulo: 'Fallas por servicio',
         icono: Icons.build_circle_outlined,
         color: AppColors.orange,
-        child: DonaChart(
-          items: d.fallasPorServicio,
-          etiquetaCentro: 'reportes',
+        child: BarrasHorizontales(items: d.fallasPorServicio),
+      ),
+      _espacio,
+      TarjetaPanel(
+        titulo: 'Barrios con más fallas',
+        subtitulo: 'Top 5 de reportes',
+        icono: Icons.location_on_outlined,
+        color: AppColors.red,
+        child: BarrasHorizontales(
+          items: [
+            for (final i in d.fallasTopBarrios)
+              ItemConteo(nombreBarrio(i.etiqueta), i.valor),
+          ],
+          colorUnico: AppColors.red,
         ),
       ),
       _espacio,
       TarjetaPanel(
         titulo: 'Cortes programados',
-        icono: Icons.power_off_outlined,
-        color: AppColors.textSecondary,
-        child: Row(
+        subtitulo: 'Avisados por notificación a cada barrio',
+        icono: Icons.event_busy_rounded,
+        color: AppColors.orange,
+        child: Column(
           children: [
-            Expanded(
-              child: _MiniCifra(
-                valor: d.cortesActivos,
-                etiqueta: 'Vigentes ahora',
-                color: AppColors.orange,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: _MiniCifra(
+                    valor: d.cortesActivos,
+                    etiqueta: 'Vigentes ahora',
+                    color: AppColors.red,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _MiniCifra(
+                    valor: d.cortesProximaSemana,
+                    etiqueta: 'En los próximos 7 días',
+                    color: AppColors.orange,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _MiniCifra(
-                valor: d.cortesTotal,
-                etiqueta: 'Registrados en total',
-                color: AppColors.primary,
-              ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _MiniCifra(
+                    valor: d.barriosConCorteAhora,
+                    etiqueta: 'Barrios afectados',
+                    color: ColoresPanel.teal,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _MiniCifra(
+                    valor: d.cortesTotal,
+                    etiqueta: 'Registrados en total',
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
       ),
+      _espacio,
+      TarjetaPanel(
+        titulo: 'Cortes por servicio',
+        icono: Icons.donut_large_rounded,
+        color: AppColors.orange,
+        child: DonaChart(items: d.cortesPorServicio, etiquetaCentro: 'cortes'),
+      ),
+      _espacio,
+      TarjetaPanel(
+        titulo: 'Barrios con más cortes',
+        subtitulo: 'Top 5 de barrios afectados',
+        icono: Icons.map_outlined,
+        color: AppColors.orange,
+        child: BarrasHorizontales(
+          items: [
+            for (final i in d.cortesTopBarrios)
+              ItemConteo(nombreBarrio(i.etiqueta), i.valor),
+          ],
+          colorUnico: AppColors.orange,
+        ),
+      ),
     ];
+  }
+
+  /// "Completado" -> "Solucionada", como se ve en la lista de fallas.
+  static String _estadoFalla(String etiqueta) =>
+      EstadoFalla.values
+          .where((e) => e.valor == etiqueta.toUpperCase())
+          .firstOrNull
+          ?.texto ??
+      etiqueta;
+
+  /// 0,5 -> "30 min"; 6 -> "6 h"; 54 -> "2,3 días".
+  static String _duracion(double horas) {
+    if (horas < 1) return '${(horas * 60).round()} min';
+    if (horas < 48) return '${_unDecimal(horas)} h';
+    return '${_unDecimal(horas / 24)} días';
   }
 
   /// Spring guarda la confianza como 0–1 o como porcentaje.
@@ -1014,12 +1278,16 @@ class _PildoraBlanca extends StatelessWidget {
         children: [
           Icon(icono, color: Colors.white, size: 15),
           const SizedBox(width: 5),
-          Text(
-            texto,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              texto,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -1140,6 +1408,144 @@ class _MiniCifra extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Botón grande de la sección Reportes (revisar fallas, programar corte).
+class _Accion extends StatelessWidget {
+  final IconData icono;
+  final String titulo;
+  final String detalle;
+  final Color color;
+  final bool alerta;
+  final VoidCallback onTap;
+
+  const _Accion({
+    required this.icono,
+    required this.titulo,
+    required this.detalle,
+    required this.color,
+    required this.onTap,
+    this.alerta = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: color.withValues(alpha: 0.35)),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [color.withValues(alpha: 0.10), AppColors.surface],
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icono, color: Colors.white, size: 21),
+                  ),
+                  const Spacer(),
+                  if (alerta)
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_forward_rounded, size: 18, color: color),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                titulo,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: estiloTitulo(15),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                detalle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: alerta ? color : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Franja roja para lo que pide atención.
+class _AvisoPanel extends StatelessWidget {
+  final String texto;
+  final VoidCallback onTap;
+
+  const _AvisoPanel({required this.texto, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.red.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.priority_high_rounded,
+                color: AppColors.red,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  texto,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.red,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.red,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

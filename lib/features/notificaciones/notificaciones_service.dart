@@ -78,7 +78,8 @@ class NotificacionesService {
 
   // ------------------------------------------------------------- ciclo de vida
 
-  /// Tras el login de un usuario (no administrador).
+  /// Tras el login. Los usuarios reciben las fallas y cortes de su barrio; los
+  /// administradores, las fallas nuevas que deben revisar.
   static Future<void> iniciar() async {
     detener();
     _ciclo = _Ciclo();

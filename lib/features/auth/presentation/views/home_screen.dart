@@ -7,6 +7,9 @@ import '../../../../core/theme/app_theme.dart';
 import '../../data/services/auth_service.dart';
 import '../../../ahorros/presentation/views/mis_ahorros_screen.dart';
 import '../../../analisis/presentation/views/historial_analisis_screen.dart';
+import '../../../clima/data/clima_service.dart';
+import '../../../clima/presentation/widgets/alerta_clima.dart';
+import '../../../clima/presentation/widgets/boton_clima.dart';
 import '../../../fallas/presentation/views/fallas_screen.dart';
 import '../../../notificaciones/data/aviso.dart';
 import '../../../notificaciones/notificaciones_service.dart';
@@ -87,10 +90,21 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _iniciarRecordatorios() async {
+    // El clima se pide de una vez para que la pastilla aparezca pronto
+    final clima = ClimaService.cargar();
+
     final recibos = await RecordatoriosService.alIniciarSesion(widget.nombre);
     if (mounted && recibos != null) {
       setState(() => _pendientes = pagosPendientes(recibos));
     }
+
+    // Después del permiso de notificaciones, para no taparlo
+    final pronostico = await clima;
+    if (pronostico == null || !await ClimaService.tocaAlertaHoy()) return;
+    // Si ya se fue a otra pantalla no se le atraviesa: sale la próxima vez
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+    await ClimaService.marcarAlertaVista();
+    if (mounted) await AlertaClima.mostrar(context, pronostico);
   }
 
   Future<void> _recargarPagos() async {
@@ -321,14 +335,20 @@ class _HomeScreenState extends State<HomeScreen>
                   style: estiloTitulo(26, color: Colors.white),
                 ),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
 
-                Text(
-                  'Cuida tus servicios y ahorra con calma.',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 14,
-                    height: 1.5,
+                // Sin clima (cargando o sin internet) queda el mensaje de siempre
+                BotonClima(
+                  mientras: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'Cuida tus servicios y ahorra con calma.',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                    ),
                   ),
                 ),
               ],

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/boton_inicio.dart';
 import '../../../analisis/presentation/views/analisis_consumo_screen.dart';
+import '../../../clima/presentation/widgets/tarjeta_por_que.dart';
 import '../../../recordatorios/recordatorios_service.dart';
 import '../../data/models/recibo.dart';
 import '../../data/services/recibo_service.dart';
@@ -148,6 +149,8 @@ class _DetalleReciboScreenState extends State<DetalleReciboScreen> {
           _buildCabecera(empresa),
           const SizedBox(height: 14),
           if (_r.id != null) _buildPago(),
+          // Solo aparece si hay un mes anterior con qué comparar
+          if (_r.consumoActual != null) TarjetaPorQue(recibo: _r),
           if (_r.historialConsumos.any((c) => c.consumo != null))
             _tarjeta('Historial de consumo (${empresa.unidad})', [
               ConsumoChart(

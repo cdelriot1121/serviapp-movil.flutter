@@ -45,6 +45,26 @@ enum EstadoFalla {
       values.firstWhere((e) => e.valor == valor, orElse: () => pendiente);
 }
 
+/// Foto que acompaña un reporte. Los enlaces son temporales (vencen en una
+/// hora); [id] no cambia y sirve para guardarla en el celular.
+class FotoFalla {
+  final String id;
+  final String url;
+  final String miniatura;
+
+  const FotoFalla({required this.id, required this.url, required this.miniatura});
+
+  factory FotoFalla.fromJson(Map<String, dynamic> json) => FotoFalla(
+        id: json['id'].toString(),
+        url: json['url'].toString(),
+        miniatura: json['miniatura']?.toString() ?? json['url'].toString(),
+      );
+
+  /// Llaves para la caché del celular: no dependen del enlace, que cambia.
+  String get claveCache => 'falla-foto-$id';
+  String get claveCacheMiniatura => 'falla-foto-mini-$id';
+}
+
 class Falla {
   final String id;
   final ServicioFalla? servicio;
@@ -61,6 +81,7 @@ class Falla {
   final int confirmaciones;
   final bool esMia;
   final bool yoConfirme;
+  final List<FotoFalla> fotos;
 
   // Solo en el panel de administradores
   final String? usuarioNombre;
@@ -78,6 +99,7 @@ class Falla {
     required this.confirmaciones,
     required this.esMia,
     required this.yoConfirme,
+    this.fotos = const [],
     this.usuarioNombre,
     this.usuarioEmail,
   });
@@ -94,6 +116,10 @@ class Falla {
         confirmaciones: (json['confirmaciones'] as num?)?.toInt() ?? 0,
         esMia: json['esMia'] == true,
         yoConfirme: json['yoConfirme'] == true,
+        fotos: [
+          for (final f in json['fotos'] as List? ?? const [])
+            FotoFalla.fromJson(Map<String, dynamic>.from(f as Map)),
+        ],
         usuarioNombre: json['usuarioNombre']?.toString(),
         usuarioEmail: json['usuarioEmail']?.toString(),
       );
@@ -102,7 +128,14 @@ class Falla {
 
   String get nombreServicio => servicio?.nombre ?? 'Servicio';
 
-  Falla copiar({EstadoFalla? estado, DateTime? fechaSolucion, int? confirmaciones, bool? yoConfirme}) => Falla(
+  Falla copiar({
+    EstadoFalla? estado,
+    DateTime? fechaSolucion,
+    int? confirmaciones,
+    bool? yoConfirme,
+    List<FotoFalla>? fotos,
+  }) =>
+      Falla(
         id: id,
         servicio: servicio,
         barrio: barrio,
@@ -114,6 +147,7 @@ class Falla {
         confirmaciones: confirmaciones ?? this.confirmaciones,
         esMia: esMia,
         yoConfirme: yoConfirme ?? this.yoConfirme,
+        fotos: fotos ?? this.fotos,
         usuarioNombre: usuarioNombre,
         usuarioEmail: usuarioEmail,
       );
@@ -174,12 +208,26 @@ class OpcionesFalla {
   final List<String> barrios;
   final String? miBarrio;
 
-  const OpcionesFalla({required this.barrios, required this.miBarrio});
+  /// Spring tiene dónde guardar fotos; si no, el formulario no las ofrece.
+  final bool fotosHabilitadas;
+  final int maxFotos;
 
-  factory OpcionesFalla.fromJson(Map<String, dynamic> json) => OpcionesFalla(
-        barrios: [for (final b in json['barrios'] as List? ?? const []) b.toString()],
-        miBarrio: json['miBarrio']?.toString(),
-      );
+  const OpcionesFalla({
+    required this.barrios,
+    required this.miBarrio,
+    this.fotosHabilitadas = false,
+    this.maxFotos = 0,
+  });
+
+  factory OpcionesFalla.fromJson(Map<String, dynamic> json) {
+    final fotos = json['fotos'] is Map ? Map<String, dynamic>.from(json['fotos'] as Map) : const {};
+    return OpcionesFalla(
+      barrios: [for (final b in json['barrios'] as List? ?? const []) b.toString()],
+      miBarrio: json['miBarrio']?.toString(),
+      fotosHabilitadas: fotos['habilitadas'] == true,
+      maxFotos: (fotos['maximo'] as num?)?.toInt() ?? 0,
+    );
+  }
 }
 
 /// ISO de Spring (UTC) -> hora local del celular.

@@ -12,7 +12,11 @@ enum TipoAviso {
   fallaBarrio('FALLA_BARRIO', Icons.report_problem_rounded, AppColors.orange),
   estadoFalla('ESTADO_FALLA', Icons.assignment_turned_in_rounded, AppColors.primary),
   fallaSolucionada('FALLA_SOLUCIONADA', Icons.check_circle_rounded, AppColors.green),
-  corteProgramado('CORTE_PROGRAMADO', Icons.event_busy_rounded, AppColors.red);
+  corteProgramado('CORTE_PROGRAMADO', Icons.event_busy_rounded, AppColors.red),
+  corteCancelado('CORTE_CANCELADO', Icons.event_available_rounded, AppColors.green),
+
+  /// Solo para administradores: una falla nueva que hay que revisar.
+  fallaNueva('FALLA_NUEVA', Icons.notification_important_rounded, AppColors.red);
 
   const TipoAviso(this.valor, this.icono, this.color);
 

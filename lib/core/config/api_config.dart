@@ -1,25 +1,13 @@
 class ApiConfig {
-  // Backend de producción
+  // Backend de producción (Railway). Es el único entorno publicado.
   static const String productionUrl =
       'https://serviapp.up.railway.app';
-
-  // Backend de desarrollo
-  static const String developmentUrl =
-      'https://springclassroomproject-serviapp-development.up.railway.app';
-
-  // Selecciona el entorno al ejecutar Flutter
-  static const bool isProduction = bool.fromEnvironment(
-    'PRODUCTION',
-    defaultValue: false,
-  );
 
   // Permite apuntar a un Spring Boot local:
   // flutter run --dart-define=SPRING_URL=http://192.168.1.55:8080
   static const String _springUrl = String.fromEnvironment('SPRING_URL');
 
-  static const String baseUrl = _springUrl != ''
-      ? _springUrl
-      : (isProduction ? productionUrl : developmentUrl);
+  static const String baseUrl = _springUrl != '' ? _springUrl : productionUrl;
 
   // Servicio FastAPI de análisis de recibos (OpenCV + OCR) desplegado en Railway.
   // Para usar el FastAPI local del PC (misma red Wi-Fi):
@@ -72,4 +60,5 @@ class ApiConfig {
   static const String adminEstadisticasEndpoint =
       '/api/mobile/admin/estadisticas';
   static const String adminFallasEndpoint = '/api/mobile/admin/fallas';
+  static const String adminCortesEndpoint = '/api/mobile/admin/cortes';
 }

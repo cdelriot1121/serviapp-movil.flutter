@@ -433,6 +433,8 @@ class _Resultado extends StatelessWidget {
             children: [
               _Fila('Modelo', p.algoritmo ?? 'Modelo de la web'),
               if (p.versionModelo != null) _Fila('Versión', p.versionModelo!),
+              if (p.porcentajeFiabilidad != null)
+                _Fila('Confiabilidad del modelo', _fiabilidad(p.porcentajeFiabilidad!)),
               _Fila('Servicio de cálculo', p.origen == 'WEB' ? 'ServiApp web' : 'FastAPI'),
               if (p.mesesUsados > 0) _Fila('Meses de historial usados', '${p.mesesUsados}'),
               _Fila('Calculado el', formatearFecha(p.calculadaEl)),
@@ -476,6 +478,9 @@ class _Resultado extends StatelessWidget {
 
   // Un decimal basta para leer el consumo
   static double _redondeo(double valor) => (valor * 10).roundToDouble() / 10;
+
+  /// 90.89 -> "90,9 %"
+  static String _fiabilidad(double valor) => '${valor.toStringAsFixed(1).replaceAll('.', ',')} %';
 
   /// Uno según la tendencia y dos de ahorro del servicio.
   static List<String> _consejos(Prediccion p) {
@@ -564,12 +569,19 @@ class _Encabezado extends StatelessWidget {
               estilo: estiloTitulo(38, color: Colors.white),
             ),
           ),
-          if (p.nivelConsumo != null || (cambio != null && ultimo != null)) ...[
+          if (p.porcentajeFiabilidad != null ||
+              p.nivelConsumo != null ||
+              (cambio != null && ultimo != null)) ...[
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
+                if (p.porcentajeFiabilidad != null)
+                  _Pastilla(
+                    icono: Icons.verified_rounded,
+                    texto: 'Confiabilidad ${_Resultado._fiabilidad(p.porcentajeFiabilidad!)}',
+                  ),
                 if (p.nivelConsumo != null)
                   _Pastilla(
                     icono: Icons.circle,

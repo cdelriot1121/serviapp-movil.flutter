@@ -6,19 +6,27 @@ import '../../../fallas/presentation/widgets/tarjeta_falla.dart';
 import '../../data/services/admin_service.dart';
 
 /// Fallas reportadas por los usuarios (igual que Reportes de usuarios en la
-/// web). Al cambiar el estado, Spring avisa a quien la reportó.
+/// web). Al cambiar el estado, Spring le avisa por push a quien la reportó y,
+/// al solucionarla, a los vecinos que la confirmaron.
 class AdminFallasScreen extends StatefulWidget {
-  const AdminFallasScreen({super.key});
+  /// Permite usar datos de prueba en los tests.
+  final AdminService? servicio;
+
+  const AdminFallasScreen({super.key, this.servicio});
+
+  /// Una falla pendiente por más de este tiempo se resalta.
+  static const demora = Duration(hours: 24);
 
   @override
   State<AdminFallasScreen> createState() => _AdminFallasScreenState();
 }
 
 class _AdminFallasScreenState extends State<AdminFallasScreen> {
-  final _service = AdminService();
+  late final AdminService _service = widget.servicio ?? AdminService();
 
   // null = todas
-  EstadoFalla? _filtro = EstadoFalla.pendiente;
+  EstadoFalla? _estado = EstadoFalla.pendiente;
+  ServicioFalla? _servicioFiltro;
   List<Falla>? _fallas;
   String? _error;
   final Set<String> _ocupadas = {};
@@ -29,15 +37,16 @@ class _AdminFallasScreenState extends State<AdminFallasScreen> {
     _cargar();
   }
 
+  // Se traen todas para mostrar cuántas hay en cada estado
   Future<void> _cargar() async {
     setState(() => _error = null);
     try {
-      final fallas = await _service.fallas(estado: _filtro);
+      final fallas = await _service.fallas();
       if (mounted) setState(() => _fallas = fallas);
     } on AdminException catch (e) {
       if (mounted) {
         setState(() {
-          _fallas = const [];
+          _fallas ??= const [];
           _error = e.mensaje;
         });
       }
@@ -49,10 +58,26 @@ class _AdminFallasScreenState extends State<AdminFallasScreen> {
     try {
       await _service.cambiarEstadoFalla(falla.id, estado);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Falla marcada como "${estado.texto.toLowerCase()}". Avisamos al usuario.')),
-      );
-      await _cargar();
+      setState(() {
+        _fallas = [
+          for (final f in _fallas!)
+            f.id == falla.id
+                ? f.copiar(
+                    estado: estado,
+                    fechaSolucion: estado == EstadoFalla.completado ? DateTime.now() : null,
+                  )
+                : f,
+        ];
+      });
+      final vecinos = estado == EstadoFalla.completado && falla.confirmaciones > 0
+          ? ' y a ${falla.confirmaciones} ${falla.confirmaciones == 1 ? 'vecino' : 'vecinos'}'
+          : '';
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text('Falla marcada como "${estado.texto.toLowerCase()}". '
+              'Le avisamos a quien la reportó$vecinos.'),
+        ));
     } on AdminException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.mensaje)));
     } finally {
@@ -60,9 +85,47 @@ class _AdminFallasScreenState extends State<AdminFallasScreen> {
     }
   }
 
+  // Foto inapropiada o con datos personales, desde el visor
+  Future<bool> _eliminarFoto(Falla falla, FotoFalla foto) async {
+    try {
+      final actualizada = await _service.eliminarFotoFalla(falla.id, foto.id);
+      if (!mounted) return true;
+      setState(() {
+        _fallas = [
+          for (final f in _fallas!) f.id == falla.id ? f.copiar(fotos: actualizada.fotos) : f,
+        ];
+      });
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Foto quitada del reporte.')));
+      return true;
+    } on AdminException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.mensaje)));
+      return false;
+    }
+  }
+
+  bool _demorada(Falla f) =>
+      f.estado == EstadoFalla.pendiente &&
+      f.fechaReporte != null &&
+      DateTime.now().difference(f.fechaReporte!) > AdminFallasScreen.demora;
+
   @override
   Widget build(BuildContext context) {
+    final todas = _fallas ?? const <Falla>[];
+    final delServicio = [
+      for (final f in todas)
+        if (_servicioFiltro == null || f.servicio == _servicioFiltro) f,
+    ];
+    final visibles = [
+      for (final f in delServicio)
+        if (_estado == null || f.estado == _estado) f,
+    ];
+    int cuantas(EstadoFalla? e) => e == null ? delServicio.length : delServicio.where((f) => f.estado == e).length;
+    final demoradas = delServicio.where(_demorada).length;
+
     return Scaffold(
+      backgroundColor: AppColors.cream,
       appBar: AppBar(title: const Text('Fallas reportadas')),
       body: Column(
         children: [
@@ -72,21 +135,36 @@ class _AdminFallasScreenState extends State<AdminFallasScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               children: [
-                for (final e in EstadoFalla.values) _chip(e, e.texto),
-                _chip(null, 'Todas'),
+                for (final e in EstadoFalla.values) _chipEstado(e, e.texto, cuantas(e)),
+                _chipEstado(null, 'Todas', cuantas(null)),
               ],
             ),
           ),
-          Expanded(child: _buildLista()),
+          SizedBox(
+            height: 46,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+              children: [
+                _chipServicio(null),
+                for (final s in ServicioFalla.values) _chipServicio(s),
+              ],
+            ),
+          ),
+          if (demoradas > 0 && _estado != EstadoFalla.completado)
+            _AvisoDemoradas(
+              cantidad: demoradas,
+              onTap: () => setState(() => _estado = EstadoFalla.pendiente),
+            ),
+          Expanded(child: _buildLista(visibles)),
         ],
       ),
     );
   }
 
-  Widget _buildLista() {
-    final fallas = _fallas;
-    if (fallas == null) return const Center(child: CircularProgressIndicator());
-    if (_error != null) {
+  Widget _buildLista(List<Falla> fallas) {
+    if (_fallas == null) return const Center(child: CircularProgressIndicator());
+    if (_error != null && _fallas!.isEmpty) {
       return Center(
         child: MensajeFallas(icono: Icons.cloud_off_rounded, texto: _error!, accion: 'Reintentar', onAccion: _cargar),
       );
@@ -95,8 +173,14 @@ class _AdminFallasScreenState extends State<AdminFallasScreen> {
       onRefresh: _cargar,
       child: fallas.isEmpty
           ? ListView(
-              children: const [
-                MensajeFallas(icono: Icons.inbox_outlined, texto: 'No hay fallas en este estado.'),
+              children: [
+                MensajeFallas(
+                  icono: _estado == EstadoFalla.pendiente ? Icons.task_alt_rounded : Icons.inbox_outlined,
+                  color: _estado == EstadoFalla.pendiente ? AppColors.green : null,
+                  texto: _estado == EstadoFalla.pendiente
+                      ? '¡Todo al día! No hay fallas pendientes por revisar.'
+                      : 'No hay fallas en este estado.',
+                ),
               ],
             )
           : ListView.separated(
@@ -111,15 +195,32 @@ class _AdminFallasScreenState extends State<AdminFallasScreen> {
   Widget _tarjeta(Falla f) {
     final ocupada = _ocupadas.contains(f.id);
     final siguiente = switch (f.estado) {
-      EstadoFalla.pendiente => (EstadoFalla.recibido, 'Marcar recibida', Icons.engineering_rounded),
+      EstadoFalla.pendiente => (EstadoFalla.recibido, 'Marcar en revisión', Icons.engineering_rounded),
       EstadoFalla.recibido => (EstadoFalla.completado, 'Marcar solucionada', Icons.check_circle_outline_rounded),
       EstadoFalla.completado => null,
     };
     return TarjetaFalla(
       falla: f,
+      onEliminarFoto: (foto) => _eliminarFoto(f, foto),
       pie: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_demorada(f))
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.timer_off_rounded, size: 17, color: AppColors.red),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Lleva más de un día sin revisar',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.red),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Row(
             children: [
               const Icon(Icons.person_outline_rounded, size: 17, color: AppColors.textSecondary),
@@ -136,11 +237,29 @@ class _AdminFallasScreenState extends State<AdminFallasScreen> {
           ),
           if (siguiente != null) ...[
             const SizedBox(height: 10),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: siguiente.$1.color),
-              onPressed: ocupada ? null : () => _cambiar(f, siguiente.$1),
-              icon: Icon(siguiente.$3),
-              label: Text(siguiente.$2),
+            Row(
+              children: [
+                // Una falla ya resuelta se puede cerrar sin pasar por revisión
+                if (f.estado == EstadoFalla.pendiente) ...[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(foregroundColor: AppColors.green),
+                      onPressed: ocupada ? null : () => _cambiar(f, EstadoFalla.completado),
+                      icon: const Icon(Icons.check_rounded),
+                      label: const Text('Solucionada'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(backgroundColor: siguiente.$1.color),
+                    onPressed: ocupada ? null : () => _cambiar(f, siguiente.$1),
+                    icon: Icon(siguiente.$3),
+                    label: FittedBox(fit: BoxFit.scaleDown, child: Text(siguiente.$2)),
+                  ),
+                ),
+              ],
             ),
           ],
         ],
@@ -148,28 +267,84 @@ class _AdminFallasScreenState extends State<AdminFallasScreen> {
     );
   }
 
-  Widget _chip(EstadoFalla? estado, String texto) {
-    final seleccionado = _filtro == estado;
+  Widget _chipEstado(EstadoFalla? estado, String texto, int cantidad) {
+    final seleccionado = _estado == estado;
     final color = estado?.color ?? AppColors.primary;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: ChoiceChip(
         selected: seleccionado,
         avatar: estado == null ? null : Icon(estado.icono, size: 17, color: seleccionado ? Colors.white : color),
-        label: Text(texto),
+        label: Text('$texto · $cantidad'),
         showCheckmark: false,
         selectedColor: color,
         labelStyle: TextStyle(
           color: seleccionado ? Colors.white : AppColors.textPrimary,
           fontWeight: FontWeight.w600,
         ),
-        onSelected: (_) {
-          setState(() {
-            _filtro = estado;
-            _fallas = null;
-          });
-          _cargar();
-        },
+        onSelected: (_) => setState(() => _estado = estado),
+      ),
+    );
+  }
+
+  Widget _chipServicio(ServicioFalla? servicio) {
+    final seleccionado = _servicioFiltro == servicio;
+    final color = servicio?.color ?? AppColors.textSecondary;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        selected: seleccionado,
+        showCheckmark: false,
+        avatar: Icon(servicio?.icono ?? Icons.apps_rounded, size: 16, color: seleccionado ? color : AppColors.textSecondary),
+        label: Text(servicio?.nombre ?? 'Todos los servicios'),
+        selectedColor: color.withValues(alpha: 0.14),
+        side: BorderSide(color: seleccionado ? color : AppColors.border),
+        labelStyle: TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
+          color: seleccionado ? color : AppColors.textSecondary,
+        ),
+        visualDensity: VisualDensity.compact,
+        onSelected: (_) => setState(() => _servicioFiltro = servicio),
+      ),
+    );
+  }
+}
+
+class _AvisoDemoradas extends StatelessWidget {
+  final int cantidad;
+  final VoidCallback onTap;
+
+  const _AvisoDemoradas({required this.cantidad, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Material(
+        color: AppColors.red.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              children: [
+                const Icon(Icons.priority_high_rounded, color: AppColors.red, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    cantidad == 1
+                        ? '1 falla lleva más de un día sin revisar.'
+                        : '$cantidad fallas llevan más de un día sin revisar.',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.red),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

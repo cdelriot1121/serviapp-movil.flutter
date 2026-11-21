@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:604437131574:android:fd7ecd070c8ad19eae4397",
+        "android_client_info": {
+          "package_name": "com.gvwc.serviapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQMPOZl9mkNpJGETPFhtC9mEVNKebVeWI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:604437131574:android:b6b64ce6c222bce2ae4397",
         "android_client_info": {
           "package_name": "com.serviapp.app"

@@ -22,6 +22,10 @@ class Prediccion {
   final String? algoritmo;
   final DateTime calculadaEl;
 
+  /// Confiabilidad del modelo para el servicio (0–100, R² de la evaluación).
+  /// null en las predicciones que no la traen (web o antiguas).
+  final double? porcentajeFiabilidad;
+
   /// Bajo, Moderado o Elevado frente a un hogar del mismo estrato.
   final String? nivelConsumo;
 
@@ -47,6 +51,7 @@ class Prediccion {
     required this.versionModelo,
     required this.algoritmo,
     required this.calculadaEl,
+    this.porcentajeFiabilidad,
     this.nivelConsumo,
     this.consumoEsperado,
     this.estrato,
@@ -84,6 +89,7 @@ class Prediccion {
       versionModelo: modelo['versionModelo']?.toString() ?? '—',
       algoritmo: modelo['algoritmo']?.toString() ?? 'Red neuronal LSTM',
       calculadaEl: DateTime.now(),
+      porcentajeFiabilidad: _fiabilidad(json['porcentajeFiabilidad']),
     );
   }
 
@@ -113,6 +119,7 @@ class Prediccion {
       versionModelo: json['versionModelo']?.toString(),
       algoritmo: json['algoritmo']?.toString(),
       calculadaEl: DateTime.tryParse(json['fecha']?.toString() ?? '') ?? DateTime.now(),
+      porcentajeFiabilidad: _fiabilidad(json['porcentajeFiabilidad']),
       nivelConsumo: json['nivelConsumo']?.toString(),
       consumoEsperado: numero('consumoEsperado'),
       estrato: numero('estrato')?.toInt(),
@@ -128,6 +135,10 @@ class Prediccion {
     return empresa;
   }
 
+  // Solo se acepta un porcentaje válido (0–100)
+  static double? _fiabilidad(Object? valor) =>
+      valor is num && valor > 0 && valor <= 100 ? valor.toDouble() : null;
+
   /// Lo que se le envía a Spring para guardarla en el historial.
   Map<String, dynamic> toJson() => {
     'tipoServicio': empresa.tipoServicio,
@@ -135,6 +146,7 @@ class Prediccion {
     'consumoEstimado': consumoEstimado,
     'versionModelo': versionModelo,
     'algoritmo': algoritmo,
+    'porcentajeFiabilidad': porcentajeFiabilidad,
     'historico': [
       for (final h in historico)
         if (h.consumo != null) {'periodo': h.periodo, 'consumo': h.consumo},

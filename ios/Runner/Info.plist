@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCameraUsageDescription</key>
+	<string>ServiApp usa la cámara para escanear tus recibos y tomar fotos de las fallas que reportas.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>ServiApp usa tus fotos para adjuntarlas a los reportes de fallas.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

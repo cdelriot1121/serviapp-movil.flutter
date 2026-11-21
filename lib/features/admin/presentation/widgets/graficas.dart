@@ -841,20 +841,35 @@ class SerieActividad {
 /// la leyenda la oculta o la muestra.
 class ActividadChart extends StatefulWidget {
   final List<ActividadMes> meses;
+  final List<SerieActividad> series;
 
-  const ActividadChart({super.key, required this.meses});
+  const ActividadChart({
+    super.key,
+    required this.meses,
+    this.series = seriesPlataforma,
+  });
 
-  static const series = [
+  static const seriesPlataforma = [
     SerieActividad('Registros', AppColors.primary, _registros),
     SerieActividad('Recibos', AppColors.green, _recibos),
     SerieActividad('Análisis', AppColors.orange, _analisis),
     SerieActividad('Predicciones', ColoresPanel.violeta, _predicciones),
   ];
 
+  /// Fallas reportadas, fallas solucionadas y cortes programados por mes.
+  static const seriesReportes = [
+    SerieActividad('Fallas reportadas', AppColors.red, _fallas),
+    SerieActividad('Solucionadas', AppColors.green, _solucionadas),
+    SerieActividad('Cortes', AppColors.orange, _cortes),
+  ];
+
   static int _registros(ActividadMes m) => m.registros;
   static int _recibos(ActividadMes m) => m.recibos;
   static int _analisis(ActividadMes m) => m.analisis;
   static int _predicciones(ActividadMes m) => m.predicciones;
+  static int _fallas(ActividadMes m) => m.fallas;
+  static int _solucionadas(ActividadMes m) => m.fallasSolucionadas;
+  static int _cortes(ActividadMes m) => m.cortes;
 
   @override
   State<ActividadChart> createState() => _ActividadChartState();
@@ -869,8 +884,8 @@ class _ActividadChartState extends State<ActividadChart> {
     if (meses.isEmpty) return const SinDatos();
 
     final visibles = [
-      for (var i = 0; i < ActividadChart.series.length; i++)
-        if (!_ocultas.contains(i)) ActividadChart.series[i],
+      for (var i = 0; i < widget.series.length; i++)
+        if (!_ocultas.contains(i)) widget.series[i],
     ];
 
     return Column(
@@ -879,12 +894,12 @@ class _ActividadChartState extends State<ActividadChart> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (var i = 0; i < ActividadChart.series.length; i++)
+            for (var i = 0; i < widget.series.length; i++)
               _ChipSerie(
-                serie: ActividadChart.series[i],
+                serie: widget.series[i],
                 total: meses.fold(
                   0,
-                  (s, m) => s + ActividadChart.series[i].valor(m),
+                  (s, m) => s + widget.series[i].valor(m),
                 ),
                 activa: !_ocultas.contains(i),
                 onTap: () => setState(() {
@@ -975,15 +990,19 @@ class _ChipSerie extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              Text(
-                '${serie.nombre} · $total',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: activa
-                      ? AppColors.textPrimary
-                      : AppColors.textSecondary,
-                  decoration: activa ? null : TextDecoration.lineThrough,
+              Flexible(
+                child: Text(
+                  '${serie.nombre} · $total',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: activa
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
+                    decoration: activa ? null : TextDecoration.lineThrough,
+                  ),
                 ),
               ),
             ],

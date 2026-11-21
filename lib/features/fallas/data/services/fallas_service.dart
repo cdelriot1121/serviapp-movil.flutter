@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../../../../core/config/api_config.dart';
@@ -44,19 +46,39 @@ class FallasService {
       });
 
   /// Devuelve la falla creada y cuántos vecinos recibieron el aviso.
+  /// [fotos] son JPEG ya comprimidos (ver FotosReporte).
   Future<({Falla falla, int vecinos})> reportar({
     required ServicioFalla servicio,
     required String barrio,
     required String horaInicio,
     String? comentarios,
+    List<Uint8List> fotos = const [],
   }) =>
       _pedir(() async {
-        final r = await _dio.post(_base, data: {
+        final campos = {
           'servicio': servicio.valor,
           'barrio': barrio,
           'horaInicio': horaInicio,
           'comentarios': comentarios,
-        });
+        };
+        final r = fotos.isEmpty
+            ? await _dio.post(_base, data: campos)
+            : await _dio.post(
+                _base,
+                data: FormData.fromMap({
+                  ...campos,
+                  'fotos': [
+                    for (var i = 0; i < fotos.length; i++)
+                      MultipartFile.fromBytes(
+                        fotos[i],
+                        filename: 'foto_${i + 1}.jpg',
+                        contentType: DioMediaType('image', 'jpeg'),
+                      ),
+                  ],
+                }),
+                // Subir fotos con datos móviles puede tardar más que una petición normal
+                options: Options(sendTimeout: const Duration(seconds: 90), receiveTimeout: const Duration(seconds: 60)),
+              );
         final datos = Map<String, dynamic>.from(r.data as Map);
         return (
           falla: Falla.fromJson(Map<String, dynamic>.from(datos['falla'] as Map)),
@@ -80,6 +102,12 @@ class FallasService {
       });
 
   Future<void> eliminar(String id) => _pedir(() => _dio.delete('$_base/$id'));
+
+  /// Quita una foto de un reporte propio. Devuelve la falla actualizada.
+  Future<Falla> eliminarFoto(String fallaId, String fotoId) => _pedir(() async {
+        final r = await _dio.delete('$_base/$fallaId/fotos/$fotoId');
+        return Falla.fromJson(Map<String, dynamic>.from(r.data as Map));
+      });
 
   Future<T> _pedir<T>(Future<T> Function() peticion) async {
     try {

@@ -28,6 +28,8 @@ enum _Etapa {
 
 /// Recordatorios locales de pago: un día antes, el día y un día después de la
 /// fecha de pago oportuno de cada recibo que no esté marcado como pagado.
+/// Siguen programados aunque el usuario cierre sesión; si otra persona inicia
+/// sesión en el celular, se reemplazan por los de sus recibos.
 ///
 /// El botón "Ya lo pagué" de la notificación funciona con la app cerrada: el
 /// pago se guarda en el celular y se sube a Spring en el siguiente inicio de
@@ -117,9 +119,14 @@ class RecordatoriosService {
     }
   }
 
-  static Future<void> alCerrarSesion() async {
+  /// Un administrador entró en el celular: no tiene recibos, así que se quitan
+  /// los recordatorios que hubiera dejado programados otro usuario.
+  static Future<void> alEntrarAdministrador() async {
     await _prefs.remove(_claveNombre);
-    if (_listo) await _plugin.cancelAll();
+    if (!_listo) return;
+    for (final p in await _plugin.pendingNotificationRequests()) {
+      await _plugin.cancel(id: p.id);
+    }
   }
 
   // ------------------------------------------------------------- recibos

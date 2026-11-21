@@ -85,6 +85,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
     if (widget.avisos) {
       NotificacionesService.iniciar();
+      RecordatoriosService.alEntrarAdministrador();
       NotificacionesService.toque.addListener(_abrirAviso);
       // Llegó un aviso (una falla nueva): las cifras cambian
       NotificacionesService.cambios.addListener(_cargar);
@@ -215,9 +216,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     if (confirmar != true || !mounted) return;
 
     _temporizador?.cancel();
-    // Antes del logout: quitar el celular de los avisos necesita la sesión
-    if (widget.avisos) await NotificacionesService.alCerrarSesion();
-    await RecordatoriosService.alCerrarSesion();
+    // El celular sigue recibiendo los avisos push de fallas nuevas
+    if (widget.avisos) NotificacionesService.alCerrarSesion();
     await AuthService().logout();
     if (mounted) _irAlLogin();
   }

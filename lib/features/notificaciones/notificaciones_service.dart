@@ -78,6 +78,14 @@ class NotificacionesService {
 
   // ------------------------------------------------------------- ciclo de vida
 
+  /// En main(), después de PushService.inicializar(): los push se muestran y
+  /// se pueden tocar aunque no haya sesión (el toque se abre al entrar).
+  static Future<void> prepararPush() async {
+    PushService.alRecibir = _alRecibirPush;
+    PushService.alTocar = alTocar;
+    await _crearCanal();
+  }
+
   /// Tras el login. Los usuarios reciben las fallas y cortes de su barrio; los
   /// administradores, las fallas nuevas que deben revisar.
   static Future<void> iniciar() async {
@@ -85,14 +93,11 @@ class NotificacionesService {
     _ciclo = _Ciclo();
     WidgetsBinding.instance.addObserver(_ciclo!);
     _timer = Timer.periodic(_intervalo, (_) => revisar());
-    await _crearCanal();
     await _toqueAlAbrirLaApp();
     await revisar();
 
     // Con push activo los avisos llegan solos: ya no hace falta preguntar
     // cada 45 s. Se sigue revisando al abrir la app, por si alguno no llegó.
-    PushService.alRecibir = _alRecibirPush;
-    PushService.alTocar = alTocar;
     if (await PushService.iniciar() && _ciclo != null) {
       _timer?.cancel();
       _timer = null;
@@ -106,14 +111,13 @@ class NotificacionesService {
     _ciclo = null;
   }
 
-  /// Antes de cerrar la sesión en Spring: este celular deja de recibir push.
-  static Future<void> alCerrarSesion() async {
+  /// Al cerrar sesión deja de preguntar por avisos (necesita la sesión), pero
+  /// el celular sigue recibiendo los push del usuario.
+  static void alCerrarSesion() {
     detener();
     noLeidas.value = 0;
     toque.value = null;
-    PushService.alRecibir = null;
-    PushService.alTocar = null;
-    await PushService.alCerrarSesion();
+    PushService.alCerrarSesion();
   }
 
   // El canal debe existir antes del primer push, que Android muestra solo

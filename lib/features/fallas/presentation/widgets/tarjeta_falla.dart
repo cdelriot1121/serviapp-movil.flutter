@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../data/models/falla.dart';
+import 'fotos_falla.dart';
 
-/// Tarjeta de una falla: servicio, barrio, hora, comentario y estado.
+/// Tarjeta de una falla: servicio, barrio, hora, comentario, fotos y estado.
 /// [pie] va debajo (botones como "A mí también" o el progreso del reporte).
 class TarjetaFalla extends StatelessWidget {
   final Falla falla;
@@ -13,12 +14,16 @@ class TarjetaFalla extends StatelessWidget {
   /// En "Mi barrio" el barrio ya está en el encabezado.
   final bool mostrarBarrio;
 
+  /// Quien reportó o un administrador pueden quitar fotos desde el visor.
+  final EliminarFoto? onEliminarFoto;
+
   const TarjetaFalla({
     super.key,
     required this.falla,
     this.pie,
     this.onTap,
     this.mostrarBarrio = true,
+    this.onEliminarFoto,
   });
 
   @override
@@ -99,6 +104,10 @@ class TarjetaFalla extends StatelessWidget {
                     style: const TextStyle(fontSize: 14, height: 1.4, color: AppColors.textPrimary),
                   ),
                 ),
+              ],
+              if (falla.fotos.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                MiniaturasFalla(fotos: falla.fotos, onEliminar: onEliminarFoto),
               ],
               const SizedBox(height: 10),
               Row(

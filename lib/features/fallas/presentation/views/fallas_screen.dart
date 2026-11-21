@@ -180,6 +180,23 @@ class _FallasScreenState extends State<FallasScreen> with SingleTickerProviderSt
     }
   }
 
+  // Desde el visor de fotos de un reporte propio
+  Future<bool> _eliminarFoto(Falla falla, FotoFalla foto) async {
+    try {
+      final actualizada = await _service.eliminarFoto(falla.id, foto.id);
+      if (!mounted) return true;
+      setState(() {
+        _mias = [for (final f in _mias ?? const <Falla>[]) f.id == falla.id ? actualizada : f];
+      });
+      _avisar('Foto quitada del reporte.');
+      _cargarBarrio();
+      return true;
+    } on FallaException catch (e) {
+      _avisar(e.mensaje);
+      return false;
+    }
+  }
+
   Future<bool> _confirmarDialogo({
     required IconData icono,
     required Color color,
@@ -403,6 +420,7 @@ class _FallasScreenState extends State<FallasScreen> with SingleTickerProviderSt
     final ocupada = _ocupadas.contains(f.id);
     return TarjetaFalla(
       falla: f,
+      onEliminarFoto: (foto) => _eliminarFoto(f, foto),
       pie: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

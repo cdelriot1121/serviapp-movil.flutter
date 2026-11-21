@@ -85,6 +85,26 @@ class _AdminFallasScreenState extends State<AdminFallasScreen> {
     }
   }
 
+  // Foto inapropiada o con datos personales, desde el visor
+  Future<bool> _eliminarFoto(Falla falla, FotoFalla foto) async {
+    try {
+      final actualizada = await _service.eliminarFotoFalla(falla.id, foto.id);
+      if (!mounted) return true;
+      setState(() {
+        _fallas = [
+          for (final f in _fallas!) f.id == falla.id ? f.copiar(fotos: actualizada.fotos) : f,
+        ];
+      });
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Foto quitada del reporte.')));
+      return true;
+    } on AdminException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.mensaje)));
+      return false;
+    }
+  }
+
   bool _demorada(Falla f) =>
       f.estado == EstadoFalla.pendiente &&
       f.fechaReporte != null &&
@@ -181,6 +201,7 @@ class _AdminFallasScreenState extends State<AdminFallasScreen> {
     };
     return TarjetaFalla(
       falla: f,
+      onEliminarFoto: (foto) => _eliminarFoto(f, foto),
       pie: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

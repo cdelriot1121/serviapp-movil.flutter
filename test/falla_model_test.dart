@@ -34,6 +34,42 @@ void main() {
     expect(falla.esMia, isFalse);
   });
 
+  test('lee las fotos de la falla con su llave para la caché', () {
+    final falla = Falla.fromJson({
+      'id': 'f3',
+      'servicio': 'agua',
+      'barrio': 'MANGA',
+      'fotos': [
+        {'id': 'x1', 'url': 'https://s3/x1.jpg?firma=1', 'miniatura': 'https://s3/x1-mini.jpg?firma=1'},
+      ],
+    });
+
+    expect(falla.fotos, hasLength(1));
+    final foto = falla.fotos.single;
+    expect(foto.miniatura, 'https://s3/x1-mini.jpg?firma=1');
+    // La llave no depende del enlace firmado, que cambia cada hora
+    expect(foto.claveCache, 'falla-foto-x1');
+    expect(foto.claveCacheMiniatura, 'falla-foto-mini-x1');
+
+    expect(falla.copiar(fotos: const []).fotos, isEmpty);
+    expect(falla.copiar(confirmaciones: 2).fotos, hasLength(1));
+  });
+
+  test('el formulario solo ofrece fotos si Spring puede guardarlas', () {
+    final con = OpcionesFalla.fromJson({
+      'barrios': ['MANGA'],
+      'miBarrio': 'MANGA',
+      'fotos': {'habilitadas': true, 'maximo': 3},
+    });
+    expect(con.fotosHabilitadas, isTrue);
+    expect(con.maxFotos, 3);
+
+    // Spring anterior o sin S3: sin fotos
+    final sin = OpcionesFalla.fromJson({'barrios': ['MANGA'], 'miBarrio': 'MANGA'});
+    expect(sin.fotosHabilitadas, isFalse);
+    expect(sin.maxFotos, 0);
+  });
+
   test('reconoce el servicio de los cortes en mayúsculas', () {
     expect(ServicioFalla.de('ENERGIA'), ServicioFalla.energia);
     expect(ServicioFalla.de('energía'), ServicioFalla.energia);

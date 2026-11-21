@@ -1,4 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -7,8 +11,9 @@ import '../../data/models/falla.dart';
 import '../../data/services/fallas_service.dart';
 
 /// Formulario de reporte, con los mismos campos de la web: servicio, barrio
-/// afectado, hora aproximada de inicio y comentario. Devuelve la falla creada
-/// y cuántos vecinos recibieron el aviso.
+/// afectado, hora aproximada de inicio y comentario, más fotos opcionales
+/// (cámara o galería). Devuelve la falla creada y cuántos vecinos recibieron
+/// el aviso.
 class ReportarFallaScreen extends StatefulWidget {
   /// Fallas activas del barrio del usuario, para sugerir confirmar en vez de repetir.
   final ResumenBarrio? barrio;
@@ -33,6 +38,10 @@ class _ReportarFallaScreenState extends State<ReportarFallaScreen> {
   TimeOfDay _hora = TimeOfDay.now();
   bool _enviando = false;
   bool _mostrarErrores = false;
+
+  // Fotos ya comprimidas, listas para enviar
+  final List<Uint8List> _fotos = [];
+  bool _preparandoFoto = false;
 
   @override
   void initState() {
@@ -92,11 +101,98 @@ class _ReportarFallaScreenState extends State<ReportarFallaScreen> {
   String get _horaTexto =>
       '${_hora.hour.toString().padLeft(2, '0')}:${_hora.minute.toString().padLeft(2, '0')}';
 
-  Future<void> _enviar() async {
+  int get _maxFotos => _opciones?.maxFotos ?? 0;
+
+  // ------------------------------------------------------------- fotos
+
+  Future<void> _agregarFoto() async {
+    final origen = await showModalBottomSheet<ImageSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (hoja) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined, color: AppColors.primary),
+              title: const Text('Tomar foto'),
+              onTap: () => Navigator.of(hoja).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
+              title: const Text('Elegir de la galería'),
+              onTap: () => Navigator.of(hoja).pop(ImageSource.gallery),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (origen == null || !mounted) return;
+
+    final restantes = _maxFotos - _fotos.length;
+    final picker = ImagePicker();
+    List<XFile> elegidas;
+    try {
+      if (origen == ImageSource.gallery && restantes > 1) {
+        elegidas = await picker.pickMultiImage(limit: restantes);
+      } else {
+        final una = await picker.pickImage(source: origen);
+        elegidas = una == null ? const [] : [una];
+      }
+    } catch (_) {
+      _avisar('No pudimos abrir la ${origen == ImageSource.camera ? 'cámara' : 'galería'}. Revisa los permisos de ServiApp.');
+      return;
+    }
+    if (elegidas.isEmpty || !mounted) return;
+
+    setState(() => _preparandoFoto = true);
+    var fallidas = 0;
+    for (final archivo in elegidas.take(restantes)) {
+      final foto = await _comprimir(archivo);
+      if (foto == null) {
+        fallidas++;
+      } else if (mounted) {
+        setState(() => _fotos.add(foto));
+      }
+    }
+    if (!mounted) return;
+    setState(() => _preparandoFoto = false);
+    if (fallidas > 0) _avisar('No pudimos usar ${fallidas == 1 ? 'una foto' : '$fallidas fotos'}. Intenta con otra.');
+    if (elegidas.length > restantes) _avisar('Solo puedes adjuntar $_maxFotos fotos.');
+  }
+
+  /// JPEG de unos 300 KB, derecho y sin metadatos (como la ubicación GPS).
+  static Future<Uint8List?> _comprimir(XFile archivo) async {
+    try {
+      return await FlutterImageCompress.compressWithFile(
+        archivo.path,
+        minWidth: 1280,
+        minHeight: 1280,
+        quality: 80,
+        format: CompressFormat.jpeg,
+        keepExif: false,
+        autoCorrectionAngle: true,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _avisar(String texto) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(texto)));
+  }
+
+  // ------------------------------------------------------------- enviar
+
+  Future<void> _enviar({bool sinFotos = false}) async {
     setState(() => _mostrarErrores = true);
     final servicio = _servicio;
     final barrio = _barrio;
-    if (servicio == null || barrio == null) return;
+    if (servicio == null || barrio == null || _preparandoFoto) return;
 
     setState(() => _enviando = true);
     try {
@@ -105,12 +201,27 @@ class _ReportarFallaScreenState extends State<ReportarFallaScreen> {
         barrio: barrio,
         horaInicio: _horaTexto,
         comentarios: _comentario.text.trim().isEmpty ? null : _comentario.text.trim(),
+        fotos: sinFotos ? const [] : List.of(_fotos),
       );
       if (mounted) Navigator.of(context).pop(resultado);
     } on FallaException catch (e) {
       if (!mounted) return;
       setState(() => _enviando = false);
-      if (e.repetida) {
+      if (e.codigo == 'FOTOS_NO_DISPONIBLES') {
+        final enviar = await showDialog<bool>(
+          context: context,
+          builder: (dialogo) => AlertDialog(
+            icon: const Icon(Icons.no_photography_outlined, size: 40, color: AppColors.orange),
+            title: const Text('No se pudieron subir las fotos'),
+            content: Text(e.mensaje, textAlign: TextAlign.center),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(dialogo).pop(false), child: const Text('Volver')),
+              TextButton(onPressed: () => Navigator.of(dialogo).pop(true), child: const Text('Enviar sin fotos')),
+            ],
+          ),
+        );
+        if (enviar == true && mounted) await _enviar(sinFotos: true);
+      } else if (e.repetida) {
         await showDialog<void>(
           context: context,
           builder: (dialogo) => AlertDialog(
@@ -220,9 +331,27 @@ class _ReportarFallaScreenState extends State<ReportarFallaScreen> {
               hintText: 'Ej.: Se fue la luz en toda la cuadra después de un ruido en el transformador.',
             ),
           ),
+          if (_opciones?.fotosHabilitadas == true && _maxFotos > 0) ...[
+            const SizedBox(height: 14),
+            Text('Fotos (opcional)', style: estiloTitulo(16)),
+            const SizedBox(height: 4),
+            Text(
+              'Hasta $_maxFotos fotos del daño: un poste caído, una fuga, el contador… '
+              'Evita que se vean caras o placas de carros.',
+              style: const TextStyle(fontSize: 13, height: 1.4, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 10),
+            _SeccionFotos(
+              fotos: _fotos,
+              maximo: _maxFotos,
+              preparando: _preparandoFoto,
+              onAgregar: _enviando ? null : _agregarFoto,
+              onQuitar: _enviando ? null : (i) => setState(() => _fotos.removeAt(i)),
+            ),
+          ],
           const SizedBox(height: 18),
           ElevatedButton.icon(
-            onPressed: _enviando ? null : _enviar,
+            onPressed: _enviando || _preparandoFoto ? null : _enviar,
             icon: _enviando
                 ? const SizedBox(
                     width: 20,
@@ -230,7 +359,9 @@ class _ReportarFallaScreenState extends State<ReportarFallaScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
                 : const Icon(Icons.campaign_rounded),
-            label: Text(_enviando ? 'Reportando…' : 'Reportar falla'),
+            label: Text(_enviando
+                ? (_fotos.isEmpty ? 'Reportando…' : 'Subiendo fotos…')
+                : 'Reportar falla'),
           ),
         ],
       ),
@@ -335,6 +466,100 @@ class _Campo extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Fotos elegidas (con una X para quitarlas) y el cuadro para agregar otra.
+class _SeccionFotos extends StatelessWidget {
+  final List<Uint8List> fotos;
+  final int maximo;
+  final bool preparando;
+  final VoidCallback? onAgregar;
+  final void Function(int indice)? onQuitar;
+
+  const _SeccionFotos({
+    required this.fotos,
+    required this.maximo,
+    required this.preparando,
+    required this.onAgregar,
+    required this.onQuitar,
+  });
+
+  static const _lado = 88.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        for (var i = 0; i < fotos.length; i++)
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.memory(fotos[i], width: _lado, height: _lado, fit: BoxFit.cover),
+              ),
+              Positioned(
+                top: -8,
+                right: -8,
+                child: Material(
+                  color: AppColors.textPrimary,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: onQuitar == null ? null : () => onQuitar!(i),
+                    child: const Padding(
+                      padding: EdgeInsets.all(5),
+                      child: Icon(Icons.close_rounded, size: 16, color: Colors.white, semanticLabel: 'Quitar foto'),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        if (preparando)
+          Container(
+            width: _lado,
+            height: _lado,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5)),
+          )
+        else if (fotos.length < maximo)
+          Material(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: onAgregar,
+              child: Container(
+                width: _lado,
+                height: _lado,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.5), width: 1.5),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.add_a_photo_outlined, color: AppColors.primary),
+                    const SizedBox(height: 4),
+                    Text(
+                      fotos.isEmpty ? 'Agregar' : '${fotos.length}/$maximo',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

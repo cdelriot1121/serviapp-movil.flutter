@@ -62,6 +62,16 @@ class AdminService {
     }
   }
 
+  /// Quita una foto inapropiada de una falla. Devuelve la falla actualizada.
+  Future<Falla> eliminarFotoFalla(String fallaId, String fotoId) async {
+    try {
+      final respuesta = await _dio.delete('${ApiConfig.adminFallasEndpoint}/$fallaId/fotos/$fotoId');
+      return Falla.fromJson(Map<String, dynamic>.from(respuesta.data as Map));
+    } on DioException catch (e) {
+      throw _error(e, 'No fue posible quitar la foto. Intenta nuevamente.');
+    }
+  }
+
   // ------------------------------------------------------------- cortes
 
   /// Vigentes primero (el más próximo arriba) y luego los ya terminados.

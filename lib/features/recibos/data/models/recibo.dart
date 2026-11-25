@@ -55,6 +55,20 @@ enum Empresa {
   final IconData icono;
   final Color color;
 
+  /// Consumo mensual máximo de un hogar (igual que Spring): más es un error de lectura.
+  double get consumoMaximo => switch (this) {
+    Empresa.afinia => 3000,
+    Empresa.aguasDeCartagena => 150,
+    Empresa.surtigas => 300,
+  };
+
+  /// [identificador] dentro de una frase: "el NIC", "la póliza", "el contrato".
+  String get identificadorEnFrase => switch (this) {
+    Empresa.afinia => 'el NIC',
+    Empresa.aguasDeCartagena => 'la póliza',
+    Empresa.surtigas => 'el contrato',
+  };
+
   static Empresa? desdeCodigo(String? codigo) {
     for (final empresa in Empresa.values) {
       if (empresa.codigo == codigo) return empresa;
@@ -69,6 +83,19 @@ class Periodo implements Comparable<Periodo> {
   final int mes;
 
   const Periodo(this.anio, this.mes);
+
+  /// Meses que se pueden registrar (igual que Spring): del mes siguiente al
+  /// actual (recibos que llegan antes de que termine el mes) hasta 3 años atrás.
+  static Periodo get maximoRecibo => actual.sumar(1);
+  static Periodo get minimoRecibo => actual.sumar(-36);
+
+  static Periodo get actual {
+    final hoy = DateTime.now();
+    return Periodo(hoy.year, hoy.month);
+  }
+
+  bool get esValidoParaRecibo =>
+      compareTo(maximoRecibo) <= 0 && compareTo(minimoRecibo) >= 0;
 
   static Periodo? parse(String? texto) {
     if (texto == null) return null;

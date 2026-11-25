@@ -178,6 +178,21 @@ class PerfilService {
     }
   }
 
+  /// Palabra que el usuario escribe para confirmar que restablece su cuenta.
+  static const palabraRestablecer = 'RESTABLECER';
+
+  /// Borra recibos, análisis, predicciones y servicios sin borrar la cuenta.
+  Future<void> restablecerCuenta() async {
+    try {
+      await _spring.post(
+        '${ApiConfig.perfilEndpoint}/restablecer',
+        data: {'confirmacion': palabraRestablecer},
+      );
+    } on DioException catch (e) {
+      throw _error(e);
+    }
+  }
+
   PerfilException _error(DioException e) {
     final status = e.response?.statusCode;
     final datos = e.response?.data;

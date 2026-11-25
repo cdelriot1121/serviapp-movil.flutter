@@ -221,12 +221,12 @@ class _ReportarFallaScreenState extends State<ReportarFallaScreen> {
           ),
         );
         if (enviar == true && mounted) await _enviar(sinFotos: true);
-      } else if (e.repetida) {
+      } else if (e.repetida || e.codigo == 'LIMITE_DIARIO') {
         await showDialog<void>(
           context: context,
           builder: (dialogo) => AlertDialog(
             icon: const Icon(Icons.info_outline_rounded, size: 40, color: AppColors.primary),
-            title: const Text('Ya la reportaste'),
+            title: Text(e.repetida ? 'Ya la reportaste' : 'Límite de reportes de hoy'),
             content: Text(e.mensaje, textAlign: TextAlign.center),
             actions: [
               TextButton(onPressed: () => Navigator.of(dialogo).pop(), child: const Text('Entendido')),
@@ -234,7 +234,13 @@ class _ReportarFallaScreenState extends State<ReportarFallaScreen> {
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.mensaje)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.mensaje),
+          // Sin código: no hubo respuesta del servidor (sin internet)
+          action: e.codigo == null
+              ? SnackBarAction(label: 'Reintentar', onPressed: () => _enviar(sinFotos: sinFotos))
+              : null,
+        ));
       }
     }
   }

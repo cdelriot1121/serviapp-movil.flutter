@@ -12,14 +12,36 @@ class ReciboException implements Exception {
   /// Id del recibo existente cuando [codigo] es RECIBO_DUPLICADO.
   final String? reciboId;
 
-  const ReciboException(this.mensaje, {this.codigo, this.reciboId});
+  /// NIC, póliza o contrato de los recibos ya guardados de la empresa cuando
+  /// [codigo] es IDENTIFICADOR_DISTINTO.
+  final String? identificadorRegistrado;
+
+  const ReciboException(
+    this.mensaje, {
+    this.codigo,
+    this.reciboId,
+    this.identificadorRegistrado,
+  });
 
   bool get esDuplicado => codigo == 'RECIBO_DUPLICADO';
+  bool get esIdentificadorDistinto => codigo == 'IDENTIFICADOR_DISTINTO';
   bool get empresaNoReconocida => codigo == 'EMPRESA_NO_RECONOCIDA';
   bool get sesionExpirada => codigo == 'SESION_EXPIRADA';
 
   @override
   String toString() => mensaje;
+}
+
+/// Lo que Spring encontró del recibo antes de guardarlo.
+class VerificacionRecibo {
+  /// Id del recibo ya guardado con el mismo identificador y mes.
+  final String? duplicadoId;
+
+  /// NIC, póliza o contrato de los recibos ya guardados de la empresa, si el
+  /// recibo es de otro: solo se pueden guardar recibos de ese.
+  final String? identificadorRegistrado;
+
+  const VerificacionRecibo({this.duplicadoId, this.identificadorRegistrado});
 }
 
 class ReciboService {
@@ -57,10 +79,11 @@ class ReciboService {
     }
   }
 
-  /// Id del recibo si ya está guardado (mismo identificador y mes), o null.
-  Future<String?> buscarDuplicado(Recibo recibo) async {
+  /// Revisa antes de guardar si el recibo ya está guardado (mismo identificador
+  /// y mes) o si es de otro NIC, póliza o contrato que los recibos de su empresa.
+  Future<VerificacionRecibo> verificar(Recibo recibo) async {
     if (recibo.identificador == null || recibo.periodoFacturado == null) {
-      return null;
+      return const VerificacionRecibo();
     }
     try {
       final respuesta = await _spring.get(
@@ -72,10 +95,13 @@ class ReciboService {
         },
       );
       final datos = Map<String, dynamic>.from(respuesta.data as Map);
-      return datos['existe'] == true ? datos['reciboId'] as String? : null;
+      return VerificacionRecibo(
+        duplicadoId: datos['existe'] == true ? datos['reciboId'] as String? : null,
+        identificadorRegistrado: datos['identificadorRegistrado'] as String?,
+      );
     } on DioException {
       // Si no se puede verificar ahora, el guardado lo volverá a validar
-      return null;
+      return const VerificacionRecibo();
     }
   }
 
@@ -95,6 +121,24 @@ class ReciboService {
           'camposCorregidos': camposCorregidos,
           'versionExtractor': versionExtractor,
         },
+      );
+      return Recibo.fromJson(Map<String, dynamic>.from(respuesta.data as Map));
+    } on DioException catch (e) {
+      throw _errorSpring(e);
+    }
+  }
+
+  /// Corrige los datos de un recibo guardado. Spring conserva la empresa y el
+  /// pago, y borra el análisis anterior (la app lo vuelve a calcular).
+  Future<Recibo> actualizar(
+    String id,
+    Recibo recibo, {
+    required List<String> camposCorregidos,
+  }) async {
+    try {
+      final respuesta = await _spring.put(
+        '${ApiConfig.recibosEndpoint}/$id',
+        data: {...recibo.toJson(), 'camposCorregidos': camposCorregidos},
       );
       return Recibo.fromJson(Map<String, dynamic>.from(respuesta.data as Map));
     } on DioException catch (e) {
@@ -188,6 +232,14 @@ class ReciboService {
       return const ReciboException(
         'Tu sesión expiró. Cierra la app e inicia sesión de nuevo.',
         codigo: 'SESION_EXPIRADA',
+      );
+    }
+    if (status == 409 && datos?['codigo'] == 'IDENTIFICADOR_DISTINTO') {
+      return ReciboException(
+        datos!['mensaje'] as String? ??
+            'Este recibo es de otro número que tus recibos anteriores.',
+        codigo: 'IDENTIFICADOR_DISTINTO',
+        identificadorRegistrado: datos['identificadorRegistrado'] as String?,
       );
     }
     if (status == 409) {

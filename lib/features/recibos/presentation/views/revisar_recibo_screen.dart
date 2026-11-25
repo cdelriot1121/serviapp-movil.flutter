@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/boton_inicio.dart';
 import '../../../analisis/presentation/views/analisis_consumo_screen.dart';
+import '../../../perfil/data/perfil_service.dart';
+import '../../../predio/data/predio_service.dart';
 import '../../../recordatorios/recordatorios_service.dart';
 import '../../data/models/recibo.dart';
 import '../../data/services/recibo_service.dart';
@@ -16,16 +18,34 @@ import 'analizando_recibo_screen.dart';
 import 'detalle_recibo_screen.dart';
 
 /// Muestra los datos extraídos por FastAPI para que el usuario los revise,
-/// corrija y confirme antes de guardarlos en Spring Boot.
+/// corrija y confirme antes de guardarlos en Spring Boot. Con
+/// [RevisarReciboScreen.editar] corrige un recibo ya guardado y devuelve el
+/// recibo actualizado.
 class RevisarReciboScreen extends StatefulWidget {
   final ResultadoAnalisis resultado;
-  final String rutaImagen;
+
+  /// Foto del recibo; null al editar un recibo guardado.
+  final String? rutaImagen;
+
+  /// Id del recibo que se edita; null al guardar uno nuevo.
+  final String? reciboId;
 
   const RevisarReciboScreen({
     super.key,
     required this.resultado,
-    required this.rutaImagen,
-  });
+    required String this.rutaImagen,
+  }) : reciboId = null;
+
+  RevisarReciboScreen.editar({super.key, required Recibo recibo})
+      : resultado = ResultadoAnalisis(
+          recibo: recibo,
+          confianza: const {},
+          camposFaltantes: const [],
+          advertencias: const [],
+          versionExtractor: '',
+        ),
+        rutaImagen = null,
+        reciboId = recibo.id;
 
   @override
   State<RevisarReciboScreen> createState() => _RevisarReciboScreenState();
@@ -54,6 +74,9 @@ double? _leerNumero(String texto) =>
 class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
   static const _umbralRevision = 0.6;
   static const _maxMeses = 12;
+
+  // Igual que Spring: un total mayor es un error de lectura
+  static const _valorTotalMaximo = 10000000;
 
   final _formKey = GlobalKey<FormState>();
   final ReciboService _service = ReciboService();
@@ -87,14 +110,40 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
   late final List<_FilaConsumo> _filas = _filasIniciales();
 
   String? _duplicadoId;
+
+  // NIC, póliza o contrato de los recibos ya guardados de la empresa cuando
+  // este recibo es de otro: solo se pueden guardar recibos de ese
+  String? _identificadorRegistrado;
   bool _guardando = false;
 
+  // Predio del usuario, para avisar si el estrato o el barrio no coinciden
+  Predio? _predio;
+
   Empresa get _empresa => _original.empresa;
+
+  bool get _editando => widget.reciboId != null;
+
+  String get _identificadorEscrito =>
+      _texto['identificador']!.text.replaceAll(RegExp(r'\s'), '');
+
+  bool get _esOtroIdentificador =>
+      _identificadorRegistrado != null &&
+      _identificadorEscrito != _identificadorRegistrado;
 
   @override
   void initState() {
     super.initState();
-    _verificarDuplicado();
+    _verificar();
+    _cargarPredio();
+  }
+
+  Future<void> _cargarPredio() async {
+    try {
+      final perfil = await PerfilService().obtener();
+      if (mounted) setState(() => _predio = perfil.predio);
+    } on PerfilException {
+      // Sin el predio solo se omite el aviso
+    }
   }
 
   @override
@@ -129,9 +178,23 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
     return filas;
   }
 
-  Future<void> _verificarDuplicado() async {
-    final id = await _service.buscarDuplicado(_original);
-    if (mounted && id != null) setState(() => _duplicadoId = id);
+  Future<void> _verificar() async {
+    final verificacion = await _service.verificar(_original);
+    if (!mounted) return;
+    setState(() {
+      // Al editar, el "duplicado" es el mismo recibo
+      _duplicadoId = verificacion.duplicadoId == widget.reciboId ? null : verificacion.duplicadoId;
+      _identificadorRegistrado = verificacion.identificadorRegistrado;
+    });
+  }
+
+  void _usarIdentificadorRegistrado() {
+    final registrado = _identificadorRegistrado;
+    if (registrado == null) return;
+    setState(() {
+      _texto['identificador']!.text = registrado;
+      _tocados.add('identificador');
+    });
   }
 
   // ---------------------------------------------------------------- estado
@@ -250,10 +313,27 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
       _mostrarMensaje('Revisa los campos marcados en rojo.');
       return;
     }
+    final problema = _primerProblema();
+    if (problema != null) {
+      _mostrarMensaje(problema);
+      return;
+    }
+    if (!await _confirmarDatosDelPredio() || !mounted) return;
 
     final recibo = _construirRecibo();
     setState(() => _guardando = true);
     try {
+      final id = widget.reciboId;
+      if (id != null) {
+        final actualizado = await _service.actualizar(
+          id,
+          recibo,
+          camposCorregidos: _camposCorregidos(recibo),
+        );
+        await RecordatoriosService.actualizarRecibo(actualizado);
+        if (mounted) Navigator.of(context).pop(actualizado);
+        return;
+      }
       final guardado = await _service.guardar(
         recibo,
         confianza: _confianza,
@@ -275,10 +355,157 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
       if (e.esDuplicado) {
         setState(() => _duplicadoId = e.reciboId);
         _dialogoDuplicado(e.mensaje);
+      } else if (e.esIdentificadorDistinto) {
+        setState(() => _identificadorRegistrado = e.identificadorRegistrado);
+        _dialogoIdentificadorDistinto(e.mensaje);
       } else {
-        _mostrarMensaje(e.mensaje);
+        // Sin código: no hubo respuesta del servidor (sin internet)
+        _mostrarMensaje(e.mensaje, reintentar: e.codigo == null ? _guardar : null);
       }
     }
+  }
+
+  // ---------------------------------------------------------- validaciones
+  // Las mismas reglas de Spring, para avisar antes de enviar
+
+  String? _errorPeriodo() {
+    final periodo = _periodo;
+    if (periodo == null || periodo.esValidoParaRecibo) return null;
+    return 'Elige un mes entre ${formatearPeriodoLargo(Periodo.minimoRecibo.toString())} '
+        'y ${formatearPeriodoLargo(Periodo.maximoRecibo.toString())}';
+  }
+
+  String? _errorValorTotal(String texto) {
+    final valor = int.tryParse(texto.trim());
+    if (valor == null) return null;
+    if (valor <= 0) return 'Debe ser mayor que cero';
+    if (valor > _valorTotalMaximo) return 'Parece demasiado alto, revísalo';
+    return null;
+  }
+
+  String? _errorLecturaActual(String texto) {
+    final actual = _leerNumero(texto);
+    final anterior = _leerNumero(_texto['lecturaAnterior']!.text);
+    if (actual != null && anterior != null && actual < anterior) {
+      return 'No puede ser menor que la anterior';
+    }
+    return null;
+  }
+
+  String? _errorConsumo(String texto) {
+    final consumo = _leerNumero(texto);
+    final maximo = _empresa.consumoMaximo;
+    if (consumo != null && consumo > maximo) {
+      return 'Máx. ${_textoNumero(maximo)} ${_empresa.unidad}';
+    }
+    return null;
+  }
+
+  String? _errorFecha(String campo) {
+    final emision = _fechaEmision;
+    final limite = _fechaLimitePago;
+    if (campo == 'fechaLimitePago' && emision != null && limite != null && limite.isBefore(emision)) {
+      return 'No puede ser antes de la emisión';
+    }
+    final inicio = _periodoInicio;
+    final fin = _periodoFin;
+    if (campo == 'periodoFin' && inicio != null && fin != null && fin.isBefore(inicio)) {
+      return 'Es antes de "Desde"';
+    }
+    return null;
+  }
+
+  /// Primer dato fuera de las reglas que no es un campo de formulario.
+  String? _primerProblema() {
+    final periodo = _errorPeriodo();
+    if (periodo != null) return 'Mes facturado: $periodo.';
+    if (_errorFecha('fechaLimitePago') != null) {
+      return 'La fecha de pago oportuno no puede ser anterior a la de emisión.';
+    }
+    if (_errorFecha('periodoFin') != null) {
+      return 'El periodo facturado termina antes de empezar. Revisa las fechas.';
+    }
+    if (_filas.any((f) => _errorConsumo(f.controller.text) != null)) {
+      return 'Un consumo supera ${_textoNumero(_empresa.consumoMaximo)} ${_empresa.unidad}. '
+          'Revisa que esté bien escrito.';
+    }
+    return null;
+  }
+
+  // ------------------------------------------------------------ predio
+
+  static String _normalizar(String texto) => texto
+      .toUpperCase()
+      .replaceAll(RegExp('[ÁÀ]'), 'A')
+      .replaceAll(RegExp('[ÉÈ]'), 'E')
+      .replaceAll(RegExp('[ÍÌ]'), 'I')
+      .replaceAll(RegExp('[ÓÒ]'), 'O')
+      .replaceAll(RegExp('[ÚÙÜ]'), 'U')
+      .replaceAll(RegExp(r'[^A-ZÑ0-9]+'), ' ')
+      .trim();
+
+  /// El barrio leído del recibo no corresponde al del predio.
+  bool get _barrioDistinto {
+    final predio = _predio;
+    final barrio = _texto['barrio']!.text.trim();
+    if (predio == null || barrio.isEmpty) return false;
+    final delRecibo = _normalizar(barrio);
+    final delPredio = _normalizar(predio.barrio);
+    return !delRecibo.contains(delPredio) && !delPredio.contains(delRecibo);
+  }
+
+  bool get _estratoDistinto {
+    final predio = _predio;
+    return predio != null && _estrato != null && _estrato != predio.estrato;
+  }
+
+  /// Si el estrato o el barrio no coinciden con el predio, pregunta antes de
+  /// guardar (el análisis de consumo usa el estrato). Devuelve si se guarda.
+  Future<bool> _confirmarDatosDelPredio() async {
+    final predio = _predio;
+    if (predio == null || (!_estratoDistinto && !_barrioDistinto)) return true;
+
+    final diferencias = [
+      if (_estratoDistinto)
+        'El recibo dice estrato $_estrato y tu predio es estrato ${predio.estrato}.',
+      if (_barrioDistinto)
+        'El recibo dice barrio ${_texto['barrio']!.text.trim().toUpperCase()} '
+            'y tu predio está en ${predio.barrio}.',
+    ];
+    final opcion = await showDialog<String>(
+      context: context,
+      builder: (dialogo) => AlertDialog(
+        icon: const Icon(Icons.home_work_outlined, color: AppColors.orange, size: 36),
+        title: const Text('No coincide con tu predio'),
+        content: Text(
+          '${diferencias.join('\n\n')}\n\nEl análisis de consumo usa el estrato. '
+          'Si el recibo es de tu casa, usa los datos de tu predio.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogo).pop('guardar'),
+            child: const Text('Guardar así'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogo).pop('predio'),
+            child: const Text('Usar mi predio'),
+          ),
+        ],
+      ),
+    );
+    if (opcion == 'predio') {
+      setState(() {
+        if (_estratoDistinto) {
+          _estrato = predio.estrato;
+          _tocados.add('estrato');
+        }
+        if (_barrioDistinto) {
+          _texto['barrio']!.text = predio.barrio;
+          _tocados.add('barrio');
+        }
+      });
+    }
+    return opcion != null;
   }
 
   void _dialogoDuplicado(String mensaje) {
@@ -288,8 +515,9 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
         icon: const Icon(Icons.inventory_2_outlined, color: AppColors.orange, size: 36),
         title: const Text('Recibo ya registrado'),
         content: Text(
-          '$mensaje\n\nSi el mes o el ${_empresa.identificador.toLowerCase()} '
-          'están mal leídos, corrígelos y vuelve a guardar.',
+          '$mensaje\n\nSi quieres registrarlo de nuevo, primero bórralo de '
+          'Mis recibos. Si el mes o ${_empresa.identificadorEnFrase} están '
+          'mal leídos, corrígelos y vuelve a guardar.',
         ),
         actions: [
           TextButton(
@@ -303,6 +531,35 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
                 _abrirExistente();
               },
               child: const Text('Ver recibo guardado'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _dialogoIdentificadorDistinto(String mensaje) {
+    final registrado = _identificadorRegistrado;
+    showDialog<void>(
+      context: context,
+      builder: (dialogo) => AlertDialog(
+        icon: const Icon(Icons.badge_outlined, color: AppColors.red, size: 36),
+        title: Text('${_empresa.identificador} diferente'),
+        content: Text(
+          '$mensaje\n\nSi leímos mal ${_empresa.identificadorEnFrase} de este '
+          'recibo, corrígelo y vuelve a guardar.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogo).pop(),
+            child: const Text('Corregir datos'),
+          ),
+          if (registrado != null)
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogo).pop();
+                _usarIdentificadorRegistrado();
+              },
+              child: Text('Usar $registrado'),
             ),
         ],
       ),
@@ -323,10 +580,13 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
     }
   }
 
-  void _mostrarMensaje(String mensaje) {
+  void _mostrarMensaje(String mensaje, {VoidCallback? reintentar}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(mensaje),
+        action: reintentar == null
+            ? null
+            : SnackBarAction(label: 'Reintentar', onPressed: reintentar),
       ),
     );
   }
@@ -361,7 +621,7 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
     // Se vuelve a analizar la foto con el extractor de la empresa correcta
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => AnalizandoReciboScreen(rutaImagen: widget.rutaImagen, empresa: empresa),
+        builder: (_) => AnalizandoReciboScreen(rutaImagen: widget.rutaImagen!, empresa: empresa),
       ),
     );
   }
@@ -378,7 +638,7 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
           ),
           body: InteractiveViewer(
             maxScale: 6,
-            child: Center(child: Image.file(File(widget.rutaImagen))),
+            child: Center(child: Image.file(File(widget.rutaImagen!))),
           ),
         ),
       ),
@@ -393,13 +653,14 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Revisa los datos'),
+        title: Text(_editando ? 'Editar recibo' : 'Revisa los datos'),
         actions: [
-          IconButton(
-            tooltip: 'Ver foto',
-            onPressed: _verFoto,
-            icon: const Icon(Icons.image_search_rounded),
-          ),
+          if (widget.rutaImagen != null)
+            IconButton(
+              tooltip: 'Ver foto',
+              onPressed: _verFoto,
+              icon: const Icon(Icons.image_search_rounded),
+            ),
           const BotonInicio(),
         ],
       ),
@@ -409,8 +670,17 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
           padding: const EdgeInsets.fromLTRB(18, 4, 18, 120),
           children: [
             _buildEmpresa(),
+            if (_esOtroIdentificador) _buildAvisoIdentificador(),
             if (_duplicadoId != null) _buildAvisoDuplicado(),
-            _buildResumenRevision(pendientes),
+            if (_editando)
+              _aviso(
+                color: AppColors.primary,
+                icono: Icons.edit_note_rounded,
+                texto: 'Corrige los datos que estén mal y guarda los cambios. '
+                    'El análisis de consumo se volverá a calcular.',
+              )
+            else
+              _buildResumenRevision(pendientes),
             _seccion('Datos principales', Icons.receipt_long_outlined, [
               _campoTexto(
                 'identificador',
@@ -424,6 +694,7 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
                 'valorTotal',
                 'Total a pagar',
                 obligatorio: true,
+                validar: _errorValorTotal,
                 prefijo: '\$ ',
                 teclado: TextInputType.number,
                 formatos: [FilteringTextInputFormatter.digitsOnly],
@@ -462,6 +733,7 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: _campoTexto('lecturaActual', 'Lectura actual',
+                        validar: _errorLecturaActual,
                         teclado: const TextInputType.numberWithOptions(decimal: true),
                         formatos: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))]),
                   ),
@@ -494,7 +766,11 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
                   )
                 : const Icon(Icons.check_circle_outline_rounded),
-            label: Text(_guardando ? 'Guardando…' : 'Confirmar y guardar'),
+            label: Text(_guardando
+                ? 'Guardando…'
+                : _editando
+                ? 'Guardar cambios'
+                : 'Confirmar y guardar'),
           ),
         ),
       ),
@@ -512,12 +788,13 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
       ),
       child: Row(
         children: [
+          if (widget.rutaImagen case final ruta?)
           GestureDetector(
             onTap: _verFoto,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.file(
-                File(widget.rutaImagen),
+                File(ruta),
                 width: 54,
                 height: 68,
                 fit: BoxFit.cover,
@@ -551,6 +828,7 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
                   '${_empresa.servicio} · consumo en ${_empresa.unidad}',
                   style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                 ),
+                if (!_editando)
                 GestureDetector(
                   onTap: _cambiarEmpresa,
                   child: const Padding(
@@ -577,10 +855,25 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
     return _aviso(
       color: AppColors.orange,
       icono: Icons.inventory_2_outlined,
-      texto: 'Ya tienes guardado un recibo de ${_empresa.nombre} de '
-          '${formatearPeriodoLargo(_original.periodoFacturado)}. '
-          'Si guardas otro igual, te avisaremos.',
+      texto: 'Ya registraste el recibo de ${_empresa.nombre} de '
+          '${formatearPeriodoLargo(_original.periodoFacturado)} y no se puede '
+          'guardar dos veces. Para registrarlo de nuevo, primero bórralo de Mis recibos.',
       accion: TextButton(onPressed: _abrirExistente, child: const Text('Ver')),
+    );
+  }
+
+  Widget _buildAvisoIdentificador() {
+    return _aviso(
+      color: AppColors.red,
+      icono: Icons.badge_outlined,
+      texto: 'Tus recibos de ${_empresa.nombre} tienen '
+          '${_empresa.identificadorEnFrase} $_identificadorRegistrado y solo '
+          'puedes guardar recibos con ese número. Para usar otro, borra tus '
+          'recibos de ${_empresa.nombre} o restablece tu cuenta desde tu perfil.',
+      accion: TextButton(
+        onPressed: _usarIdentificadorRegistrado,
+        child: const Text('Usar'),
+      ),
     );
   }
 
@@ -691,6 +984,8 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
     String? prefijo,
     Widget? sufijo,
     bool mostrarAyuda = true,
+    // Dato fuera de las reglas (mes, consumo, fechas)
+    String? error,
   }) {
     final color = switch (estado) {
       _Estado.ok => AppColors.border,
@@ -713,6 +1008,8 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
         _Estado.falta => 'No se pudo leer, ingrésalo',
       },
       helperStyle: TextStyle(color: color == AppColors.border ? null : color),
+      errorText: error,
+      errorMaxLines: 2,
       suffixIcon: sufijo ??
           (estado == _Estado.ok
               ? null
@@ -728,6 +1025,7 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
     String? prefijo,
     TextInputType? teclado,
     List<TextInputFormatter>? formatos,
+    String? Function(String valor)? validar,
   }) {
     final controller = _texto[campo]!;
     return Padding(
@@ -742,9 +1040,13 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
           _estado(campo, vacio: controller.text.trim().isEmpty),
           prefijo: prefijo,
         ),
-        validator: obligatorio
-            ? (valor) => (valor == null || valor.trim().isEmpty) ? 'Este dato es obligatorio' : null
-            : null,
+        autovalidateMode: validar == null ? null : AutovalidateMode.onUserInteraction,
+        validator: (valor) {
+          if (obligatorio && (valor == null || valor.trim().isEmpty)) {
+            return 'Este dato es obligatorio';
+          }
+          return validar?.call(valor ?? '');
+        },
         onChanged: (_) => setState(() => _tocados.add(campo)),
       ),
     );
@@ -780,6 +1082,7 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
           decoration: _decoracion(
             etiqueta,
             _estado(campo, vacio: valor == null),
+            error: _errorFecha(campo),
             sufijo: valor == null
                 ? const Icon(Icons.calendar_today_outlined, size: 18)
                 : IconButton(
@@ -818,6 +1121,7 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
                 ? _Estado.falta
                 : _estado('periodoFacturado', vacio: false),
             sufijo: const Icon(Icons.expand_more_rounded),
+            error: _errorPeriodo(),
           ),
           child: Text(_periodo == null ? '' : formatearPeriodoLargo(_periodo.toString())),
         ),
@@ -829,6 +1133,8 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: DropdownButtonFormField<int?>(
+        // Se reconstruye si el estrato cambia desde "Usar mi predio"
+        key: ValueKey(_estrato),
         initialValue: _estrato,
         decoration: _decoracion('Estrato', _estado('estrato', vacio: _estrato == null)),
         items: [
@@ -943,6 +1249,7 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
                 null,
                 estado,
                 mostrarAyuda: false,
+                error: _errorConsumo(fila.controller.text),
                 sufijo: Padding(
                   padding: const EdgeInsets.only(right: 12, top: 12),
                   child: Text(_empresa.unidad, style: const TextStyle(color: AppColors.textSecondary)),

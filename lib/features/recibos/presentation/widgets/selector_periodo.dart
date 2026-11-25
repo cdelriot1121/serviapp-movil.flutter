@@ -4,12 +4,13 @@ import '../../../../core/theme/app_colors.dart';
 import '../../data/models/recibo.dart';
 import '../utils/formatos.dart';
 
-/// Diálogo para elegir un mes (año + mes).
+/// Diálogo para elegir el mes de un recibo: solo los meses que se pueden
+/// registrar (del mes siguiente al actual hasta 3 años atrás).
 Future<Periodo?> seleccionarPeriodo(BuildContext context, Periodo? inicial) {
-  final ahora = DateTime.now();
+  final valido = inicial != null && inicial.esValidoParaRecibo;
   return showDialog<Periodo>(
     context: context,
-    builder: (_) => _SelectorPeriodo(inicial: inicial ?? Periodo(ahora.year, ahora.month)),
+    builder: (_) => _SelectorPeriodo(inicial: valido ? inicial : Periodo.actual),
   );
 }
 
@@ -39,7 +40,7 @@ class _SelectorPeriodoState extends State<_SelectorPeriodo> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
-                  onPressed: () => setState(() => _anio--),
+                  onPressed: _anio > Periodo.minimoRecibo.anio ? () => setState(() => _anio--) : null,
                   icon: const Icon(Icons.chevron_left_rounded),
                 ),
                 Text(
@@ -47,7 +48,7 @@ class _SelectorPeriodoState extends State<_SelectorPeriodo> {
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                 ),
                 IconButton(
-                  onPressed: _anio < DateTime.now().year + 1 ? () => setState(() => _anio++) : null,
+                  onPressed: _anio < Periodo.maximoRecibo.anio ? () => setState(() => _anio++) : null,
                   icon: const Icon(Icons.chevron_right_rounded),
                 ),
               ],
@@ -65,7 +66,9 @@ class _SelectorPeriodoState extends State<_SelectorPeriodo> {
                   _BotonMes(
                     texto: mesesLargos[mes - 1].substring(0, 3),
                     seleccionado: widget.inicial == Periodo(_anio, mes),
-                    onTap: () => Navigator.of(context).pop(Periodo(_anio, mes)),
+                    onTap: Periodo(_anio, mes).esValidoParaRecibo
+                        ? () => Navigator.of(context).pop(Periodo(_anio, mes))
+                        : null,
                   ),
               ],
             ),
@@ -85,7 +88,8 @@ class _SelectorPeriodoState extends State<_SelectorPeriodo> {
 class _BotonMes extends StatelessWidget {
   final String texto;
   final bool seleccionado;
-  final VoidCallback onTap;
+  // Null: mes fuera del rango permitido
+  final VoidCallback? onTap;
 
   const _BotonMes({required this.texto, required this.seleccionado, required this.onTap});
 
@@ -102,7 +106,11 @@ class _BotonMes extends StatelessWidget {
             texto,
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: seleccionado ? Colors.white : AppColors.textPrimary,
+              color: seleccionado
+                  ? Colors.white
+                  : onTap == null
+                  ? AppColors.textSecondary.withValues(alpha: 0.4)
+                  : AppColors.textPrimary,
             ),
           ),
         ),

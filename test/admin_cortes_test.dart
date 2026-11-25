@@ -70,6 +70,10 @@ class _ServicioFalso extends AdminService {
   ];
   Map<String, Object?>? programado;
   String? cancelado;
+
+  // Simula que ya hay un corte en ese horario: Spring pide confirmar
+  bool superpuesto = false;
+  bool confirmoSuperposicion = false;
   final List<(String, EstadoFalla)> cambios = [];
 
   @override
@@ -86,7 +90,15 @@ class _ServicioFalso extends AdminService {
     required String horaFinal,
     required String motivo,
     required List<String> barrios,
+    bool confirmarSuperposicion = false,
   }) async {
+    if (superpuesto && !confirmarSuperposicion) {
+      throw const AdminException(
+        'Ya hay un corte de agua ese día de 09:00 a 11:00 en MANGA. ¿Quieres programar este de todos modos?',
+        codigo: 'CORTE_SUPERPUESTO',
+      );
+    }
+    confirmoSuperposicion = confirmarSuperposicion;
     programado = {
       'servicio': servicio,
       'fecha': fecha,
@@ -198,7 +210,7 @@ void main() {
 
   group('ProgramarCorteScreen', () {
     testWidgets('arma el corte, muestra la notificación y lo envía', (tester) async {
-      final servicio = _ServicioFalso();
+      final servicio = _ServicioFalso()..superpuesto = true;
       CorteProgramadoResultado? resultado;
       tester.view.physicalSize = const Size(1080, 2340);
       tester.view.devicePixelRatio = 3;
@@ -268,6 +280,13 @@ void main() {
 
       await tester.tap(find.text('Programar y avisar'));
       await tester.pumpAndSettle();
+
+      // Se cruza con otro corte: el administrador decide programarlo igual
+      expect(find.text('Ya hay un corte en ese horario'), findsOneWidget);
+      expect(servicio.programado, isNull);
+      await tester.tap(find.text('Programar igual'));
+      await tester.pumpAndSettle();
+      expect(servicio.confirmoSuperposicion, isTrue);
 
       expect(servicio.programado, {
         'servicio': ServicioFalla.agua,

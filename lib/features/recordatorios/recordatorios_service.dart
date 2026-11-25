@@ -192,6 +192,20 @@ class RecordatoriosService {
     cambios.value++;
   }
 
+  /// La cuenta se restableció: ya no hay recibos, así que se quitan sus
+  /// recordatorios y los pagos que faltaba subir.
+  static Future<void> cuentaRestablecida() async {
+    await _guardarPendientes({});
+    if (_listo) {
+      for (final p in await _plugin.pendingNotificationRequests()) {
+        if (_leerPayload(p.payload)?['reciboId'] != null) {
+          await _plugin.cancel(id: p.id);
+        }
+      }
+    }
+    cambios.value++;
+  }
+
   // ------------------------------------------------------------- programación
 
   static Future<void> _programarTodos(List<Recibo> recibos, String nombre) async {

@@ -87,14 +87,25 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
   late final List<_FilaConsumo> _filas = _filasIniciales();
 
   String? _duplicadoId;
+
+  // NIC, póliza o contrato de los recibos ya guardados de la empresa cuando
+  // este recibo es de otro: solo se pueden guardar recibos de ese
+  String? _identificadorRegistrado;
   bool _guardando = false;
 
   Empresa get _empresa => _original.empresa;
 
+  String get _identificadorEscrito =>
+      _texto['identificador']!.text.replaceAll(RegExp(r'\s'), '');
+
+  bool get _esOtroIdentificador =>
+      _identificadorRegistrado != null &&
+      _identificadorEscrito != _identificadorRegistrado;
+
   @override
   void initState() {
     super.initState();
-    _verificarDuplicado();
+    _verificar();
   }
 
   @override
@@ -129,9 +140,22 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
     return filas;
   }
 
-  Future<void> _verificarDuplicado() async {
-    final id = await _service.buscarDuplicado(_original);
-    if (mounted && id != null) setState(() => _duplicadoId = id);
+  Future<void> _verificar() async {
+    final verificacion = await _service.verificar(_original);
+    if (!mounted) return;
+    setState(() {
+      _duplicadoId = verificacion.duplicadoId;
+      _identificadorRegistrado = verificacion.identificadorRegistrado;
+    });
+  }
+
+  void _usarIdentificadorRegistrado() {
+    final registrado = _identificadorRegistrado;
+    if (registrado == null) return;
+    setState(() {
+      _texto['identificador']!.text = registrado;
+      _tocados.add('identificador');
+    });
   }
 
   // ---------------------------------------------------------------- estado
@@ -275,6 +299,9 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
       if (e.esDuplicado) {
         setState(() => _duplicadoId = e.reciboId);
         _dialogoDuplicado(e.mensaje);
+      } else if (e.esIdentificadorDistinto) {
+        setState(() => _identificadorRegistrado = e.identificadorRegistrado);
+        _dialogoIdentificadorDistinto(e.mensaje);
       } else {
         _mostrarMensaje(e.mensaje);
       }
@@ -288,8 +315,9 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
         icon: const Icon(Icons.inventory_2_outlined, color: AppColors.orange, size: 36),
         title: const Text('Recibo ya registrado'),
         content: Text(
-          '$mensaje\n\nSi el mes o el ${_empresa.identificador.toLowerCase()} '
-          'están mal leídos, corrígelos y vuelve a guardar.',
+          '$mensaje\n\nSi quieres registrarlo de nuevo, primero bórralo de '
+          'Mis recibos. Si el mes o ${_empresa.identificadorEnFrase} están '
+          'mal leídos, corrígelos y vuelve a guardar.',
         ),
         actions: [
           TextButton(
@@ -303,6 +331,35 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
                 _abrirExistente();
               },
               child: const Text('Ver recibo guardado'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _dialogoIdentificadorDistinto(String mensaje) {
+    final registrado = _identificadorRegistrado;
+    showDialog<void>(
+      context: context,
+      builder: (dialogo) => AlertDialog(
+        icon: const Icon(Icons.badge_outlined, color: AppColors.red, size: 36),
+        title: Text('${_empresa.identificador} diferente'),
+        content: Text(
+          '$mensaje\n\nSi leímos mal ${_empresa.identificadorEnFrase} de este '
+          'recibo, corrígelo y vuelve a guardar.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogo).pop(),
+            child: const Text('Corregir datos'),
+          ),
+          if (registrado != null)
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogo).pop();
+                _usarIdentificadorRegistrado();
+              },
+              child: Text('Usar $registrado'),
             ),
         ],
       ),
@@ -409,6 +466,7 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
           padding: const EdgeInsets.fromLTRB(18, 4, 18, 120),
           children: [
             _buildEmpresa(),
+            if (_esOtroIdentificador) _buildAvisoIdentificador(),
             if (_duplicadoId != null) _buildAvisoDuplicado(),
             _buildResumenRevision(pendientes),
             _seccion('Datos principales', Icons.receipt_long_outlined, [
@@ -577,10 +635,25 @@ class _RevisarReciboScreenState extends State<RevisarReciboScreen> {
     return _aviso(
       color: AppColors.orange,
       icono: Icons.inventory_2_outlined,
-      texto: 'Ya tienes guardado un recibo de ${_empresa.nombre} de '
-          '${formatearPeriodoLargo(_original.periodoFacturado)}. '
-          'Si guardas otro igual, te avisaremos.',
+      texto: 'Ya registraste el recibo de ${_empresa.nombre} de '
+          '${formatearPeriodoLargo(_original.periodoFacturado)} y no se puede '
+          'guardar dos veces. Para registrarlo de nuevo, primero bórralo de Mis recibos.',
       accion: TextButton(onPressed: _abrirExistente, child: const Text('Ver')),
+    );
+  }
+
+  Widget _buildAvisoIdentificador() {
+    return _aviso(
+      color: AppColors.red,
+      icono: Icons.badge_outlined,
+      texto: 'Tus recibos de ${_empresa.nombre} tienen '
+          '${_empresa.identificadorEnFrase} $_identificadorRegistrado y solo '
+          'puedes guardar recibos con ese número. Para usar otro, borra tus '
+          'recibos de ${_empresa.nombre} o restablece tu cuenta desde tu perfil.',
+      accion: TextButton(
+        onPressed: _usarIdentificadorRegistrado,
+        child: const Text('Usar'),
+      ),
     );
   }
 

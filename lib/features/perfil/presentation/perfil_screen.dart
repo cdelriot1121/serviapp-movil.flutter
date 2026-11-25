@@ -11,6 +11,7 @@ import '../../predicciones/presentation/views/historial_predicciones_screen.dart
 import '../../predio/data/predio_service.dart';
 import '../../predio/presentation/registro_predio_screen.dart';
 import '../../recibos/presentation/utils/formatos.dart';
+import '../../recordatorios/recordatorios_service.dart';
 import '../data/perfil_service.dart';
 
 /// "Mi perfil", con lo mismo que la web: datos personales, predio,
@@ -139,6 +140,31 @@ class _PerfilScreenState extends State<PerfilScreen>
     if (cambiada == true && mounted) _avisar('¡Contraseña cambiada con éxito!');
   }
 
+  /// Dos confirmaciones: primero lo que se borra y lo que se conserva, luego
+  /// escribir la palabra RESTABLECER.
+  Future<void> _restablecerCuenta(Perfil perfil) async {
+    final continuar = await showDialog<bool>(
+      context: context,
+      builder: (_) => _AvisoRestablecerDialog(perfil: perfil),
+    );
+    if (continuar != true || !mounted) return;
+
+    final restablecida = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _ConfirmarRestablecerDialog(service: _service),
+    );
+    if (restablecida != true || !mounted) return;
+
+    await RecordatoriosService.cuentaRestablecida();
+    await _cargar();
+    if (mounted) {
+      _avisar(
+        'Tu cuenta quedó restablecida. Ya puedes escanear tus recibos desde cero.',
+      );
+    }
+  }
+
   // ------------------------------------------------------------ vista
 
   @override
@@ -177,6 +203,8 @@ class _PerfilScreenState extends State<PerfilScreen>
                     _misServicios(perfil.servicios),
                     const SizedBox(height: 26),
                     _seguridad(perfil),
+                    const SizedBox(height: 26),
+                    _restablecer(perfil),
                   ],
                 ),
               ),
@@ -523,6 +551,56 @@ class _PerfilScreenState extends State<PerfilScreen>
                       'La misma para la app y la página web.',
                       style: TextStyle(
                         fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _restablecer(Perfil perfil) {
+    return _Seccion(
+      titulo: 'Restablecer cuenta',
+      icono: Icons.restart_alt_rounded,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => _restablecerCuenta(perfil),
+        child: const Padding(
+          padding: EdgeInsets.fromLTRB(16, 14, 12, 14),
+          child: Row(
+            children: [
+              _IconoCirculo(
+                icono: Icons.delete_sweep_rounded,
+                color: AppColors.red,
+              ),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Empezar de cero',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.red,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Borra tus recibos, análisis y servicios sin borrar tu '
+                      'cuenta. Así puedes registrar recibos con otro NIC, '
+                      'póliza o contrato.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -1014,6 +1092,238 @@ class _ErrorCarga extends StatelessWidget {
 }
 
 // ------------------------------------------------------------------ edición
+
+/// Primera confirmación para restablecer la cuenta: muestra qué se borra y
+/// qué se conserva, y pide marcar que no se puede deshacer. Devuelve true
+/// para continuar.
+class _AvisoRestablecerDialog extends StatefulWidget {
+  final Perfil perfil;
+
+  const _AvisoRestablecerDialog({required this.perfil});
+
+  @override
+  State<_AvisoRestablecerDialog> createState() =>
+      _AvisoRestablecerDialogState();
+}
+
+class _AvisoRestablecerDialogState extends State<_AvisoRestablecerDialog> {
+  bool _entendido = false;
+
+  static String _cantidad(int n, String uno, String varios) =>
+      n == 1 ? '1 $uno' : '$n $varios';
+
+  @override
+  Widget build(BuildContext context) {
+    final actividad = widget.perfil.actividad;
+    final servicios = widget.perfil.servicios.length;
+    final seBorra = [
+      _cantidad(actividad.recibos, 'recibo escaneado', 'recibos escaneados'),
+      _cantidad(actividad.analisis, 'análisis de consumo', 'análisis de consumo'),
+      _cantidad(actividad.predicciones, 'predicción', 'predicciones'),
+      '${_cantidad(servicios, 'servicio', 'servicios')} del hogar con su NIC, '
+          'póliza o contrato y sus habitantes',
+      'Los recordatorios de pago de tus recibos',
+    ];
+    const seConserva = [
+      'Tu nombre, correo y contraseña',
+      'Tu predio',
+      'Las fallas que reportaste',
+    ];
+
+    return AlertDialog(
+      icon: const Icon(Icons.warning_amber_rounded, size: 40, color: AppColors.red),
+      title: const Text('¿Restablecer tu cuenta?'),
+      scrollable: true,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Tu cuenta quedará como recién creada. Se borrará:',
+            style: TextStyle(fontSize: 14.5, height: 1.4),
+          ),
+          const SizedBox(height: 8),
+          for (final item in seBorra)
+            _Vineta(texto: item, icono: Icons.close_rounded, color: AppColors.red),
+          const SizedBox(height: 12),
+          const Text(
+            'Se conserva:',
+            style: TextStyle(fontSize: 14.5, height: 1.4),
+          ),
+          const SizedBox(height: 8),
+          for (final item in seConserva)
+            _Vineta(texto: item, icono: Icons.check_rounded, color: AppColors.green),
+          const SizedBox(height: 10),
+          CheckboxListTile(
+            value: _entendido,
+            onChanged: (v) => setState(() => _entendido = v ?? false),
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: const Text(
+              'Entiendo que esto no se puede deshacer.',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+          onPressed: _entendido ? () => Navigator.of(context).pop(true) : null,
+          child: const Text('Continuar'),
+        ),
+      ],
+    );
+  }
+}
+
+class _Vineta extends StatelessWidget {
+  final String texto;
+  final IconData icono;
+  final Color color;
+
+  const _Vineta({required this.texto, required this.icono, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icono, size: 18, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              texto,
+              style: const TextStyle(
+                fontSize: 13.5,
+                height: 1.35,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Segunda confirmación: escribir RESTABLECER. Restablece la cuenta y
+/// devuelve true cuando el servidor terminó.
+class _ConfirmarRestablecerDialog extends StatefulWidget {
+  final PerfilService service;
+
+  const _ConfirmarRestablecerDialog({required this.service});
+
+  @override
+  State<_ConfirmarRestablecerDialog> createState() =>
+      _ConfirmarRestablecerDialogState();
+}
+
+class _ConfirmarRestablecerDialogState
+    extends State<_ConfirmarRestablecerDialog> {
+  final _palabra = TextEditingController();
+  bool _restableciendo = false;
+  String? _error;
+
+  bool get _coincide =>
+      _palabra.text.trim().toUpperCase() == PerfilService.palabraRestablecer;
+
+  @override
+  void dispose() {
+    _palabra.dispose();
+    super.dispose();
+  }
+
+  Future<void> _restablecer() async {
+    if (!_coincide) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _restableciendo = true;
+      _error = null;
+    });
+    try {
+      await widget.service.restablecerCuenta();
+      if (mounted) Navigator.of(context).pop(true);
+    } on PerfilException catch (e) {
+      if (mounted) {
+        setState(() {
+          _restableciendo = false;
+          _error = e.mensaje;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      icon: const Icon(Icons.delete_sweep_rounded, size: 40, color: AppColors.red),
+      title: const Text('Última confirmación'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text.rich(
+            TextSpan(
+              text: 'Para restablecer tu cuenta escribe ',
+              children: [
+                TextSpan(
+                  text: PerfilService.palabraRestablecer,
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                TextSpan(text: ' en el campo.'),
+              ],
+            ),
+            style: TextStyle(fontSize: 14.5, height: 1.4),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _palabra,
+            autofocus: true,
+            enabled: !_restableciendo,
+            textCapitalization: TextCapitalization.characters,
+            autocorrect: false,
+            enableSuggestions: false,
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _restablecer(),
+            decoration: InputDecoration(
+              hintText: PerfilService.palabraRestablecer,
+              prefixIcon: const Icon(Icons.keyboard_rounded),
+              errorText: _error,
+              errorMaxLines: 3,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _restableciendo ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+          onPressed: _restableciendo || !_coincide ? null : _restablecer,
+          child: _restableciendo
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Text('Restablecer cuenta'),
+        ),
+      ],
+    );
+  }
+}
 
 /// Cambia el nombre (el correo no se puede cambiar, igual que en la web).
 /// Devuelve el nombre guardado.

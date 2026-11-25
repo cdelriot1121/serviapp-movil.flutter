@@ -55,6 +55,13 @@ enum Empresa {
   final IconData icono;
   final Color color;
 
+  /// [identificador] dentro de una frase: "el NIC", "la póliza", "el contrato".
+  String get identificadorEnFrase => switch (this) {
+    Empresa.afinia => 'el NIC',
+    Empresa.aguasDeCartagena => 'la póliza',
+    Empresa.surtigas => 'el contrato',
+  };
+
   static Empresa? desdeCodigo(String? codigo) {
     for (final empresa in Empresa.values) {
       if (empresa.codigo == codigo) return empresa;

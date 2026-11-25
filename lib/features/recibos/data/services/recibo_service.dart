@@ -128,6 +128,24 @@ class ReciboService {
     }
   }
 
+  /// Corrige los datos de un recibo guardado. Spring conserva la empresa y el
+  /// pago, y borra el análisis anterior (la app lo vuelve a calcular).
+  Future<Recibo> actualizar(
+    String id,
+    Recibo recibo, {
+    required List<String> camposCorregidos,
+  }) async {
+    try {
+      final respuesta = await _spring.put(
+        '${ApiConfig.recibosEndpoint}/$id',
+        data: {...recibo.toJson(), 'camposCorregidos': camposCorregidos},
+      );
+      return Recibo.fromJson(Map<String, dynamic>.from(respuesta.data as Map));
+    } on DioException catch (e) {
+      throw _errorSpring(e);
+    }
+  }
+
   /// Archivero del usuario. [tipoServicio]: ENERGIA, AGUA, GAS o null (todos).
   Future<List<Recibo>> listar({String? tipoServicio}) async {
     try {

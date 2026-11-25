@@ -16,6 +16,10 @@ class AdminException implements Exception {
   /// Sin sesión (401) o la cuenta ya no es administradora (403).
   bool get sesionExpirada => codigo == 'SESION_EXPIRADA';
 
+  /// Ya hay un corte del mismo servicio, día, barrio y horario: se puede
+  /// programar de todos modos con `confirmarSuperposicion`.
+  bool get corteSuperpuesto => codigo == 'CORTE_SUPERPUESTO';
+
   @override
   String toString() => mensaje;
 }
@@ -105,6 +109,7 @@ class AdminService {
     required String horaFinal,
     required String motivo,
     required List<String> barrios,
+    bool confirmarSuperposicion = false,
   }) async {
     try {
       final respuesta = await _dio.post(
@@ -116,6 +121,7 @@ class AdminService {
           'horaFinal': horaFinal,
           'motivo': motivo,
           'barrios': barrios,
+          if (confirmarSuperposicion) 'confirmarSuperposicion': true,
         },
       );
       final datos = Map<String, dynamic>.from(respuesta.data as Map);

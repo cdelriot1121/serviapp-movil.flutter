@@ -96,7 +96,8 @@ class _ProgramarCorteScreenState extends State<ProgramarCorteScreen> {
       context: context,
       initialDate: _fecha,
       firstDate: _hoy,
-      lastDate: _hoy.add(const Duration(days: 365)),
+      // Igual que Spring: máximo 60 días de anticipación
+      lastDate: _hoy.add(const Duration(days: 60)),
       helpText: 'Día del corte',
     );
     if (fecha != null) setState(() => _fecha = fecha);
@@ -144,7 +145,7 @@ class _ProgramarCorteScreenState extends State<ProgramarCorteScreen> {
     }
   }
 
-  Future<void> _enviar() async {
+  Future<void> _enviar({bool confirmarSuperposicion = false}) async {
     if (_problema != null || _enviando) return;
     setState(() => _enviando = true);
     try {
@@ -155,13 +156,41 @@ class _ProgramarCorteScreenState extends State<ProgramarCorteScreen> {
         horaFinal: horaTexto(_fin),
         motivo: _motivo.text.trim(),
         barrios: List.of(_barrios),
+        confirmarSuperposicion: confirmarSuperposicion,
       );
       if (mounted) Navigator.of(context).pop<CorteProgramadoResultado>(resultado);
     } on AdminException catch (e) {
       if (!mounted) return;
       setState(() => _enviando = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.mensaje)));
+      if (!e.corteSuperpuesto) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.mensaje)));
+      } else if (await _confirmarSuperposicion(e.mensaje) && mounted) {
+        await _enviar(confirmarSuperposicion: true);
+      }
     }
+  }
+
+  // Ya hay un corte que se cruza con este: el administrador decide
+  Future<bool> _confirmarSuperposicion(String mensaje) async {
+    final programar = await showDialog<bool>(
+      context: context,
+      builder: (dialogo) => AlertDialog(
+        icon: const Icon(Icons.event_busy_rounded, color: AppColors.orange, size: 36),
+        title: const Text('Ya hay un corte en ese horario'),
+        content: Text(mensaje),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogo).pop(false),
+            child: const Text('Revisar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogo).pop(true),
+            child: const Text('Programar igual'),
+          ),
+        ],
+      ),
+    );
+    return programar == true;
   }
 
   // ------------------------------------------------------------- UI

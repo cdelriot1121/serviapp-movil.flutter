@@ -70,4 +70,20 @@ void main() {
     expect(formatearNumero(15.61), '15,61');
     expect(formatearPeriodoLargo('2026-09'), 'Septiembre 2026');
   });
+
+  test('solo se aceptan recibos del mes siguiente hasta 3 años atrás', () {
+    final actual = Periodo.actual;
+    expect(actual.esValidoParaRecibo, isTrue);
+    expect(actual.sumar(1).esValidoParaRecibo, isTrue);
+    expect(actual.sumar(2).esValidoParaRecibo, isFalse);
+    expect(actual.sumar(-36).esValidoParaRecibo, isTrue);
+    expect(actual.sumar(-37).esValidoParaRecibo, isFalse);
+  });
+
+  test('topes de consumo por empresa iguales a los de Spring', () {
+    expect(Empresa.afinia.consumoMaximo, 3000);
+    expect(Empresa.aguasDeCartagena.consumoMaximo, 150);
+    expect(Empresa.surtigas.consumoMaximo, 300);
+    expect(Empresa.aguasDeCartagena.identificadorEnFrase, 'la póliza');
+  });
 }

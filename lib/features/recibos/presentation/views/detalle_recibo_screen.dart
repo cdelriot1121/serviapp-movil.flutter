@@ -12,6 +12,7 @@ import '../utils/formatos.dart';
 import '../widgets/boton_pago.dart';
 import '../widgets/consumo_chart.dart';
 import 'mis_recibos_screen.dart';
+import 'revisar_recibo_screen.dart';
 
 /// Detalle de un recibo guardado en el archivero.
 class DetalleReciboScreen extends StatefulWidget {
@@ -98,6 +99,18 @@ class _DetalleReciboScreenState extends State<DetalleReciboScreen> {
     }
   }
 
+  // Corrige un dato mal leído sin borrar y volver a escanear el recibo
+  Future<void> _editar() async {
+    final actualizado = await Navigator.of(context).push<Recibo>(
+      MaterialPageRoute(builder: (_) => RevisarReciboScreen.editar(recibo: _r)),
+    );
+    if (actualizado == null || !mounted) return;
+    setState(() => _r = actualizado);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Recibo actualizado')),
+    );
+  }
+
   void _irAMisRecibos() {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const MisRecibosScreen()),
@@ -112,6 +125,12 @@ class _DetalleReciboScreenState extends State<DetalleReciboScreen> {
       appBar: AppBar(
         title: Text(formatearPeriodoLargo(_r.periodoFacturado)),
         actions: [
+          if (_r.id != null)
+            IconButton(
+              tooltip: 'Editar',
+              onPressed: _eliminando ? null : _editar,
+              icon: const Icon(Icons.edit_outlined),
+            ),
           if (_r.id != null)
             IconButton(
               tooltip: 'Eliminar',
